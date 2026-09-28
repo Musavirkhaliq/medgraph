@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Brain, X, User, Network, Calendar, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
-import { getPatientMemoryTimeline, getGlobalMemory } from '../../services/api';
+import { getPatientMemoryTimeline, getGlobalMemory, getPatientFollowups } from '../../services/api';
 
 export default function ClinicalMemoryModal({ isOpen, onClose, patient }) {
   const [activeTab, setActiveTab] = useState('local'); // 'local' | 'global' | 'followups'
   const [localMems, setLocalMems] = useState([]);
   const [globalMems, setGlobalMems] = useState([]);
+  const [followups, setFollowups] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -15,10 +16,13 @@ export default function ClinicalMemoryModal({ isOpen, onClose, patient }) {
       setIsLoading(true);
       try {
         const patientId = patient?.id || 'pat-001';
-        const [timelineData, globalData] = await Promise.all([
+        const [timelineData, globalData, followupData] = await Promise.all([
           getPatientMemoryTimeline(patientId).catch(() => null),
-          getGlobalMemory().catch(() => null)
+          getGlobalMemory().catch(() => null),
+          getPatientFollowups(patientId).catch(() => null),
         ]);
+
+        setFollowups(Array.isArray(followupData?.followups) ? followupData.followups : []);
 
         const timeline = timelineData?.timeline;
         if (Array.isArray(timeline) && timeline.length > 0) {
@@ -228,13 +232,27 @@ export default function ClinicalMemoryModal({ isOpen, onClose, patient }) {
             <div className="space-y-3">
               <div className="p-4 rounded-xl bg-slate-950/70 border border-white/5 space-y-2">
                 <span className="font-bold text-teal-300 block">Upcoming Consultations &amp; Care Continuity</span>
-                <div className="p-3 rounded-lg bg-slate-900 border border-white/5 flex justify-between items-center">
-                  <div>
-                    <div className="font-bold text-white">Outpatient Pulmonary Follow-up (Post-Exacerbation)</div>
-                    <div className="text-slate-400 text-[11px]">Provider: Attending Physician &bull; Pulmonary Suite</div>
+                {followups.length === 0 && (
+                  <div className="p-3 rounded-lg bg-slate-900 border border-white/5 text-slate-500 text-[11px]">
+                    No follow-ups scheduled for this patient.
                   </div>
-                  <span className="font-mono text-cyan-400 font-bold">Scheduled in 7 Days</span>
-                </div>
+                )}
+                {followups.map((f) => (
+                  <div key={f.id} className="p-3 rounded-lg bg-slate-900 border border-white/5 flex justify-between items-center gap-3">
+                    <div>
+                      <div className="font-bold text-white">{f.title}</div>
+                      <div className="text-slate-400 text-[11px]">
+                        {f.followup_type ? f.followup_type.replace('_', ' ') : 'Appointment'}
+                        {f.description ? ` • ${f.description}` : ''}
+                      </div>
+                    </div>
+                    <span className={`font-mono font-bold text-[11px] px-2 py-0.5 rounded ${
+                      f.status === 'completed' ? 'text-teal-400' : f.status === 'missed' || f.status === 'cancelled' ? 'text-rose-400' : 'text-cyan-400'
+                    }`}>
+                      {f.due_date} &bull; {f.status}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           )}

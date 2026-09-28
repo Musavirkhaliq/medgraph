@@ -1,30 +1,45 @@
 import React from 'react';
-import { 
-  AlertCircle, 
-  CheckCircle2, 
-  Activity, 
-  FileText, 
-  ChevronRight, 
+import {
+  AlertCircle,
+  CheckCircle2,
+  Activity,
+  FileText,
+  ChevronRight,
   Stethoscope,
   Sparkles,
   ShieldAlert
 } from 'lucide-react';
+import { normalizeSymptoms, normalizeInvestigations, normalizeDifferential } from '../../utils/clinical';
 
-export default function RightIntelligenceHud({ 
-  triageLevel = "Urgent", 
-  triageConfidence = 94, 
-  symptoms = [], 
-  tests = [], 
-  differential = [], 
+export default function RightIntelligenceHud({
+  triageLevel = "Urgent",
+  triageConfidence = 94,
+  symptoms = [],
+  tests = [],
+  differential = [],
   onGenerateReportClick,
-  canGenerateReport = true 
+  canGenerateReport = true
 }) {
-  const defaultSymptoms = symptoms.length > 0 ? symptoms : [
+  const normalizedSymptoms = normalizeSymptoms(symptoms);
+  const defaultSymptoms = normalizedSymptoms.length > 0 ? normalizedSymptoms : [
     { entity: "Shortness of breath (Dyspnea)", status: "Reported Present" },
     { entity: "Expiratory wheezing", status: "Auscultated" },
     { entity: "Occupational dust exposure", status: "Identified Trigger" },
     { entity: "Retrosternal chest pressure", status: "Ruled Out" },
     { entity: "Fever & Chills", status: "Absent" }
+  ];
+
+  const normalizedTests = normalizeInvestigations(tests);
+  const defaultTests = normalizedTests.length > 0 ? normalizedTests.slice(0, 5) : [
+    { name: "Chest Radiograph (CXR PA)" },
+    { name: "Pre/Post Spirometry (FEV1)" },
+    { name: "CBC with Diff (Eosinophils)" },
+  ];
+
+  const normalizedDiffs = normalizeDifferential(differential);
+  const topDiffs = normalizedDiffs.length > 0 ? normalizedDiffs.slice(0, 2) : [
+    { condition: "Asthma Exacerbation", confidence: 92 },
+    { condition: "Pneumonia (J18.9)", confidence: 42 },
   ];
 
   const getTriageColor = (level) => {
@@ -87,18 +102,12 @@ export default function RightIntelligenceHud({
         </div>
 
         <div className="space-y-1 text-xs text-slate-300">
-          <div className="flex items-center gap-1.5 text-teal-400">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Chest Radiograph (CXR PA)</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-teal-400">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>Pre/Post Spirometry (FEV1)</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-teal-400">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            <span>CBC with Diff (Eosinophils)</span>
-          </div>
+          {defaultTests.map((t, i) => (
+            <div key={i} className="flex items-center gap-1.5 text-teal-400">
+              <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+              <span className="truncate">{t.name}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -109,25 +118,17 @@ export default function RightIntelligenceHud({
         </div>
 
         <div className="space-y-2 text-xs">
-          <div>
-            <div className="flex justify-between text-[11px] mb-1">
-              <span className="text-white font-medium truncate">1. Asthma Exacerbation</span>
-              <span className="text-cyan-400 font-mono font-bold">92%</span>
+          {topDiffs.map((d, i) => (
+            <div key={i}>
+              <div className="flex justify-between text-[11px] mb-1">
+                <span className={`font-medium truncate ${i === 0 ? 'text-white' : 'text-slate-300'}`}>{i + 1}. {d.condition}</span>
+                <span className={`font-mono font-bold ${d.confidence > 70 ? 'text-cyan-400' : 'text-amber-400'}`}>{d.confidence}%</span>
+              </div>
+              <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
+                <div className={`h-full rounded-full ${d.confidence > 70 ? 'bg-cyan-400' : 'bg-amber-400'}`} style={{ width: `${d.confidence}%` }} />
+              </div>
             </div>
-            <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-cyan-400 rounded-full" style={{ width: '92%' }} />
-            </div>
-          </div>
-
-          <div>
-            <div className="flex justify-between text-[11px] mb-1">
-              <span className="text-slate-300 truncate">2. Pneumonia (J18.9)</span>
-              <span className="text-amber-400 font-mono font-bold">42%</span>
-            </div>
-            <div className="h-1 bg-slate-800 rounded-full overflow-hidden">
-              <div className="h-full bg-amber-400 rounded-full" style={{ width: '42%' }} />
-            </div>
-          </div>
+          ))}
         </div>
       </div>
 

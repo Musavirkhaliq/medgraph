@@ -1,26 +1,28 @@
 import React, { useState } from 'react';
-import { 
-  FileCheck, 
-  Upload, 
-  Eye, 
-  Sparkles, 
-  AlertCircle, 
-  CheckCircle2, 
+import {
+  FileCheck,
+  Upload,
+  Eye,
+  Sparkles,
+  AlertCircle,
+  CheckCircle2,
   Maximize2,
   FileText
 } from 'lucide-react';
+import { normalizeInvestigations } from '../../utils/clinical';
 
-export default function DicomLabsViewer({ 
-  sessionId, 
-  investigations = [], 
-  onAnalyzeImage 
+export default function DicomLabsViewer({
+  sessionId,
+  investigations = [],
+  onAnalyzeImage
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
 
-  const defaultLabs = investigations.length > 0 ? investigations : [
+  const normalized = normalizeInvestigations(investigations);
+  const defaultLabs = normalized.length > 0 ? normalized : [
     { name: "Posteroanterior Chest Radiograph (CXR)", status: "Completed", result: "Hyperinflation of bilateral lung fields. Flattened diaphragms. No active focal consolidation, pleural effusion, or pneumothorax." },
     { name: "Bedside Spirometry (FEV1 / FVC)", status: "Completed", result: "FEV1 64% of predicted, post-bronchodilator improvement of 16% (260mL), confirming reversible obstructive airway defect." },
     { name: "Complete Blood Count (CBC) with Diff", status: "Completed", result: "WBC 7.8 x10³/µL, Eosinophils 6.8% (Mild peripheral eosinophilia). Hemoglobin 14.2 g/dL." },
@@ -174,18 +176,20 @@ export default function DicomLabsViewer({
               {defaultLabs.map((lab, i) => (
                 <div key={i} className="p-3.5 rounded-xl bg-slate-950/70 border border-white/5 space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <div className="font-semibold text-xs text-white">{lab.name || lab.test_name}</div>
+                    <div className="font-semibold text-xs text-white">{lab.name}</div>
                     <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
                       lab.status === 'Completed'
                         ? 'bg-teal-500/10 text-teal-400 border border-teal-500/20'
+                        : (lab.priority || '').toLowerCase() === 'urgent'
+                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
                         : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                     }`}>
-                      {lab.status || 'ORDERED'}
+                      {lab.status === 'Completed' ? 'Completed' : (lab.priority || 'Ordered')}
                     </span>
                   </div>
 
                   <div className="text-[11px] text-slate-300 leading-relaxed pl-2 border-l-2 border-cyan-500/30">
-                    {lab.result || "Awaiting laboratory transmission."}
+                    {lab.result || lab.indication || "Awaiting laboratory transmission."}
                   </div>
                 </div>
               ))}

@@ -1,20 +1,22 @@
 import React from 'react';
-import { 
-  Network, 
-  CheckCircle2, 
-  AlertCircle, 
-  HelpCircle, 
-  TrendingUp, 
-  Sparkles, 
-  FileText 
+import {
+  Network,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  TrendingUp,
+  Sparkles,
+  FileText
 } from 'lucide-react';
+import { normalizeDifferential } from '../../utils/clinical';
 
-export default function DifferentialMatrix({ 
-  primaryDiagnosis, 
-  differential = [], 
-  confidence = 90 
+export default function DifferentialMatrix({
+  primaryDiagnosis,
+  differential = [],
+  confidence = 90
 }) {
-  const defaultDiffs = differential.length > 0 ? differential : [
+  const normalized = normalizeDifferential(differential);
+  const defaultDiffs = normalized.length > 0 ? normalized : [
     {
       condition: "Acute Asthma Exacerbation (J45.909)",
       category: "Pulmonary / Bronchospasm",

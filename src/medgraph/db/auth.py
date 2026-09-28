@@ -21,6 +21,14 @@ _local_users_db: dict[str, dict] = {
         "role": "admin",
         "department": "Executive System Administration",
     },
+    "admin@medai.ltm": {
+        "id": "adm-001",
+        "email": "admin@medai.ltm",
+        "password": "password123",
+        "full_name": "System Administrator",
+        "role": "admin",
+        "department": "Executive System Administration",
+    },
     "doctor@medai.ltm": {
         "id": "doc-001",
         "email": "doctor@medai.ltm",
@@ -93,6 +101,52 @@ async def login_user(email: str, password: str) -> tuple[UserProfile | None, str
             logger.error("[Auth] Live Supabase sign-in failed: %s", exc)
 
     return None, "User account not found. Please check your credentials or register an account."
+
+
+async def list_users(role: UserRole | None = None) -> list[UserProfile]:
+    """List all registered users, optionally filtered by role (Admin directories)."""
+    profiles: list[UserProfile] = []
+    for user_info in _local_users_db.values():
+        if role and user_info.get("role") != role:
+            continue
+        profiles.append(
+            UserProfile(
+                id=user_info["id"],
+                email=user_info["email"],
+                full_name=user_info["full_name"],
+                role=user_info["role"],
+                license_number=user_info.get("license_number"),
+                specialty=user_info.get("specialty"),
+                department=user_info.get("department"),
+                phone=user_info.get("phone"),
+            )
+        )
+
+    client = get_db_client()
+    if client.is_configured:
+        try:
+            params = {"role": f"eq.{role}"} if role else {}
+            rows = await client.rest_request("GET", "user_profiles", params=params)
+            seen_emails = {p.email for p in profiles}
+            for row in rows or []:
+                if row.get("email") in seen_emails:
+                    continue
+                profiles.append(
+                    UserProfile(
+                        id=row["id"],
+                        email=row["email"],
+                        full_name=row.get("full_name", ""),
+                        role=row.get("role", "patient"),
+                        license_number=row.get("license_number"),
+                        specialty=row.get("specialty"),
+                        department=row.get("department"),
+                        phone=row.get("phone"),
+                    )
+                )
+        except Exception as exc:
+            logger.error("[Auth] Failed to list users from Supabase: %s", exc)
+
+    return profiles
 
 
 async def signup_user(

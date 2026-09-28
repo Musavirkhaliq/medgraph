@@ -49,22 +49,26 @@ export default function AuthLoginModal({ isOpen, onClose, onLoginSuccess, defaul
     setError(null);
     try {
       const res = await loginUser(email, password);
-      onLoginSuccess(res?.user || {
-        id: role === 'doctor' ? 'doc-001' : role === 'admin' ? 'adm-001' : 'pat-001',
-        full_name: role === 'doctor' ? 'Dr. Sarah Jenkins, MD' : role === 'admin' ? 'System Administrator' : 'John Doe',
-        email: email,
-        role: role
-      });
+      if (!res?.user) {
+        throw new Error("Malformed authentication response.");
+      }
+      onLoginSuccess(res.user);
       onClose();
     } catch (err) {
-      // Allow demo login fallback
-      onLoginSuccess({
-        id: role === 'doctor' ? 'doc-001' : role === 'admin' ? 'adm-001' : 'pat-001',
-        full_name: role === 'doctor' ? 'Dr. Sarah Jenkins, MD' : role === 'admin' ? 'System Administrator' : 'John Doe',
-        email: email,
-        role: role
-      });
-      onClose();
+      // A network/connectivity failure (backend unreachable) is not the same as
+      // a rejected login — only fall back to a local demo session in that case.
+      // TypeError is what `fetch` throws when it cannot reach the server at all.
+      if (err instanceof TypeError) {
+        onLoginSuccess({
+          id: role === 'doctor' ? 'doc-001' : role === 'admin' ? 'adm-001' : 'pat-001',
+          full_name: role === 'doctor' ? 'Dr. Sarah Jenkins, MD' : role === 'admin' ? 'System Administrator' : 'John Doe',
+          email: email,
+          role: role
+        });
+        onClose();
+        return;
+      }
+      setError(err.message || "Invalid email or password.");
     } finally {
       setIsLoading(false);
     }

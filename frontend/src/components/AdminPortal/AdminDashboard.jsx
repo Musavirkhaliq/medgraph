@@ -1,24 +1,26 @@
-import React, { useState } from 'react';
-import { 
-  ShieldCheck, 
-  Users, 
-  Database, 
-  Brain, 
-  ArrowLeft, 
-  UserPlus, 
-  Search, 
-  CheckCircle2, 
-  Stethoscope, 
-  Activity, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  ShieldCheck,
+  Users,
+  Database,
+  Brain,
+  ArrowLeft,
+  UserPlus,
+  Search,
+  CheckCircle2,
+  Stethoscope,
+  Activity,
   Network,
-  X
+  X,
+  RefreshCw
 } from 'lucide-react';
-import { registerDoctor, registerPatient } from '../../services/api';
+import { registerDoctor, registerPatient, listDoctors, listAdminPatients, getGlobalMemory } from '../../services/api';
 
-export default function AdminDashboard({ onBackToHub }) {
+export default function AdminDashboard({ onBackToHub, user }) {
   const [activeTab, setActiveTab] = useState('doctors'); // 'doctors' | 'patients' | 'global-memory'
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('doctor'); // 'doctor' | 'patient'
+  const [isLoadingDirectory, setIsLoadingDirectory] = useState(false);
 
   // Registration Form State
   const [docName, setDocName] = useState('');
@@ -35,85 +37,106 @@ export default function AdminDashboard({ onBackToHub }) {
   const [patChronic, setPatChronic] = useState('');
   const [regStatus, setRegStatus] = useState(null);
 
-  const [doctorsList, setDoctorsList] = useState([
-    { id: "doc-001", name: "Dr. Sarah Jenkins, MD", email: "dr.jenkins@medai.org", license: "MD-98210-NY", specialty: "Pulmonology & Internal Medicine", status: "Active Duty" },
-    { id: "doc-002", name: "Dr. Alex Smith, MD", email: "dr.smith@medai.org", license: "MD-41029-CA", specialty: "Cardiovascular Medicine", status: "Active Duty" },
-    { id: "doc-003", name: "Dr. Elena Rostova, MD", email: "dr.rostova@medai.org", license: "MD-77182-MA", specialty: "Emergency Medicine & Triage", status: "Active Duty" }
-  ]);
+  const [doctorsList, setDoctorsList] = useState([]);
+  const [patientsList, setPatientsList] = useState([]);
+  const [globalClusters, setGlobalClusters] = useState([]);
 
-  const [patientsList, setPatientsList] = useState([
-    { id: "pat-001", name: "John Doe", mrn: "MRN-2026-0891", dob: "1976-03-14", gender: "Male", allergies: "Penicillin", status: "Active Record" },
-    { id: "pat-002", name: "Jane Miller", mrn: "MRN-2026-1042", dob: "1983-09-22", gender: "Female", allergies: "None Known", status: "Active Record" },
-    { id: "pat-003", name: "Robert Chen", mrn: "MRN-2026-0419", dob: "1958-11-04", gender: "Male", allergies: "Sulfa Drugs", status: "Active Record" }
-  ]);
+  const requesterRole = user?.role || 'admin';
+
+  const mapDoctor = (d) => ({
+    id: d.id,
+    name: d.full_name,
+    email: d.email,
+    license: d.license_number || 'N/A',
+    specialty: d.specialty || 'General Medicine',
+    status: 'Active Duty',
+  });
+
+  const mapPatient = (p) => ({
+    id: p.id,
+    name: p.full_name,
+    mrn: p.mrn,
+    dob: p.date_of_birth,
+    gender: p.gender,
+    allergies: Array.isArray(p.allergies) && p.allergies.length > 0
+      ? p.allergies.map(a => (typeof a === 'string' ? a : a.allergen)).filter(Boolean).join(', ')
+      : 'None Known',
+    status: 'Active Record',
+  });
+
+  const loadDirectory = useCallback(async () => {
+    setIsLoadingDirectory(true);
+    try {
+      const [docsRes, patsRes, globalRes] = await Promise.all([
+        listDoctors(),
+        listAdminPatients(),
+        getGlobalMemory(),
+      ]);
+
+      setDoctorsList(Array.isArray(docsRes?.doctors) ? docsRes.doctors.map(mapDoctor) : []);
+      setPatientsList(Array.isArray(patsRes?.patients) ? patsRes.patients.map(mapPatient) : []);
+      setGlobalClusters(Array.isArray(globalRes?.global_memories) ? globalRes.global_memories : []);
+    } catch (err) {
+      console.warn("Failed to load admin directory from backend:", err);
+    } finally {
+      setIsLoadingDirectory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDirectory();
+  }, [loadDirectory]);
 
   const handleRegisterDoctor = async (e) => {
     e.preventDefault();
     setRegStatus("Registering physician account...");
     try {
-      await registerDoctor({
+      const res = await registerDoctor({
         full_name: docName,
         email: docEmail,
         password: docPass,
         license_number: docLicense,
         specialty: docSpecialty
-      });
-      setDoctorsList(prev => [
-        { id: `doc-${Date.now().toString().slice(-3)}`, name: docName, email: docEmail, license: docLicense, specialty: docSpecialty, status: "Active Duty" },
-        ...prev
-      ]);
+      }, requesterRole);
+      const created = res?.doctor
+        ? mapDoctor(res.doctor)
+        : { id: `doc-${Date.now().toString().slice(-3)}`, name: docName, email: docEmail, license: docLicense, specialty: docSpecialty, status: "Active Duty" };
+      setDoctorsList(prev => [created, ...prev]);
       setRegStatus("Physician successfully provisioned!");
+      setDocName(''); setDocEmail('');
       setTimeout(() => {
         setIsModalOpen(false);
         setRegStatus(null);
       }, 1500);
     } catch (err) {
-      // Fallback local state append
-      setDoctorsList(prev => [
-        { id: `doc-${Date.now().toString().slice(-3)}`, name: docName, email: docEmail, license: docLicense, specialty: docSpecialty, status: "Active Duty" },
-        ...prev
-      ]);
-      setRegStatus("Account registered in local system.");
-      setTimeout(() => {
-        setIsModalOpen(false);
-        setRegStatus(null);
-      }, 1200);
+      setRegStatus(err.message || "Registration failed. Please try again.");
     }
   };
 
   const handleRegisterPatient = async (e) => {
     e.preventDefault();
     setRegStatus("Provisioning patient MRN...");
-    const mrn = `MRN-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     try {
-      await registerPatient({
+      const res = await registerPatient({
         full_name: patName,
         date_of_birth: patDob,
         gender: patGender,
-        mrn: mrn,
         email: patEmail,
-        allergies: patAllergies,
-        chronic_conditions: patChronic
-      });
-      setPatientsList(prev => [
-        { id: `pat-${Date.now().toString().slice(-3)}`, name: patName, mrn: mrn, dob: patDob, gender: patGender, allergies: patAllergies || "None", status: "Active Record" },
-        ...prev
-      ]);
-      setRegStatus("Patient account & MRN created!");
+        allergies: patAllergies ? patAllergies.split(',').map(a => a.trim()).filter(Boolean) : [],
+        chronic_conditions: patChronic ? patChronic.split(',').map(c => c.trim()).filter(Boolean) : [],
+      }, requesterRole);
+      const created = res?.patient
+        ? mapPatient(res.patient)
+        : { id: `pat-${Date.now().toString().slice(-3)}`, name: patName, mrn: 'Pending', dob: patDob, gender: patGender, allergies: patAllergies || "None", status: "Active Record" };
+      setPatientsList(prev => [created, ...prev]);
+      setRegStatus(res?.message || "Patient account & MRN created!");
+      setPatName(''); setPatEmail(''); setPatAllergies(''); setPatChronic('');
       setTimeout(() => {
         setIsModalOpen(false);
         setRegStatus(null);
       }, 1500);
     } catch (err) {
-      setPatientsList(prev => [
-        { id: `pat-${Date.now().toString().slice(-3)}`, name: patName, mrn: mrn, dob: patDob, gender: patGender, allergies: patAllergies || "None", status: "Active Record" },
-        ...prev
-      ]);
-      setRegStatus("Patient registered in local system.");
-      setTimeout(() => {
-        setIsModalOpen(false);
-        setRegStatus(null);
-      }, 1200);
+      setRegStatus(err.message || "Registration failed. Please try again.");
     }
   };
 
@@ -183,16 +206,23 @@ export default function AdminDashboard({ onBackToHub }) {
 
         <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-1">
           <span className="text-[11px] text-slate-500 font-medium uppercase font-mono">Collective Intelligence</span>
-          <div className="text-2xl font-bold text-amber-400">2 Clusters</div>
+          <div className="text-2xl font-bold text-amber-400">{globalClusters.length} Clusters</div>
           <span className="text-[10px] text-slate-400">Cross-Patient Pattern Graph</span>
         </div>
       </div>
 
       {/* Directory Datagrid Tabs */}
       <div className="p-6 rounded-2xl bg-slate-900/80 border border-white/10 space-y-4">
-        
+
         <div className="flex items-center justify-between border-b border-white/5 pb-3">
           <div className="flex items-center gap-2">
+            <button
+              onClick={loadDirectory}
+              title="Refresh from backend"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoadingDirectory ? 'animate-spin' : ''}`} />
+            </button>
             <button
               onClick={() => setActiveTab('doctors')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
@@ -231,6 +261,12 @@ export default function AdminDashboard({ onBackToHub }) {
         {/* Tab 1: Doctors */}
         {activeTab === 'doctors' && (
           <div className="space-y-3">
+            {isLoadingDirectory && doctorsList.length === 0 && (
+              <div className="p-6 text-center text-slate-400 text-xs">Loading physician directory...</div>
+            )}
+            {!isLoadingDirectory && doctorsList.length === 0 && (
+              <div className="p-6 text-center text-slate-500 text-xs">No physicians registered yet. Use "Register Account" to add one.</div>
+            )}
             {doctorsList.map((doc) => (
               <div key={doc.id} className="p-4 rounded-xl bg-slate-950/70 border border-white/5 flex items-center justify-between gap-4 text-xs">
                 <div>
@@ -249,6 +285,12 @@ export default function AdminDashboard({ onBackToHub }) {
         {/* Tab 2: Patients */}
         {activeTab === 'patients' && (
           <div className="space-y-3">
+            {isLoadingDirectory && patientsList.length === 0 && (
+              <div className="p-6 text-center text-slate-400 text-xs">Loading patient directory...</div>
+            )}
+            {!isLoadingDirectory && patientsList.length === 0 && (
+              <div className="p-6 text-center text-slate-500 text-xs">No patient records yet. Use "Register Account" to add one.</div>
+            )}
             {patientsList.map((pat) => (
               <div key={pat.id} className="p-4 rounded-xl bg-slate-950/70 border border-white/5 flex items-center justify-between gap-4 text-xs">
                 <div>
@@ -275,14 +317,18 @@ export default function AdminDashboard({ onBackToHub }) {
               Synthesized from historical patient encounters in Supabase vector embeddings. Anonymized pathophysiological links are continuously integrated into the clinical diagnostic graph.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-              <div className="p-3 rounded-lg bg-slate-900 border border-white/5 space-y-1">
-                <span className="font-bold text-white block">Cluster #1: Obstructive Pulmonary (Asthma / Dust)</span>
-                <p className="text-slate-400 text-[11px]">Identified correlation between heavy occupational particulate exposure and rapid FEV1 drop.</p>
-              </div>
-              <div className="p-3 rounded-lg bg-slate-900 border border-white/5 space-y-1">
-                <span className="font-bold text-white block">Cluster #2: Beta-Lactam Anaphylaxis Guardrail</span>
-                <p className="text-slate-400 text-[11px]">Strict validator rule preventing 2nd/3rd generation cephalosporin prescribing when severe penicillin anaphylaxis is flagged.</p>
-              </div>
+              {(globalClusters.length > 0 ? globalClusters : [
+                { id: 'gmem-fallback-1', topic: 'Obstructive Pulmonary (Asthma / Dust)', summary: 'Identified correlation between heavy occupational particulate exposure and rapid FEV1 drop.' },
+                { id: 'gmem-fallback-2', topic: 'Beta-Lactam Anaphylaxis Guardrail', summary: 'Strict validator rule preventing 2nd/3rd generation cephalosporin prescribing when severe penicillin anaphylaxis is flagged.' },
+              ]).map((cluster) => (
+                <div key={cluster.id} className="p-3 rounded-lg bg-slate-900 border border-white/5 space-y-1">
+                  <span className="font-bold text-white block">{cluster.topic}</span>
+                  <p className="text-slate-400 text-[11px]">{cluster.summary}</p>
+                  {cluster.case_count && (
+                    <span className="text-[10px] text-cyan-400 font-mono">{cluster.case_count} contributing cases &bull; {Math.round((cluster.confidence_score || 0) * 100)}% confidence</span>
+                  )}
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -430,12 +476,35 @@ export default function AdminDashboard({ onBackToHub }) {
                 </div>
 
                 <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Patient Email (enables portal login)</label>
+                  <input
+                    type="email"
+                    value={patEmail}
+                    onChange={(e) => setPatEmail(e.target.value)}
+                    placeholder="e.g. jane.miller@example.com"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-1">Optional. If provided, a Patient Portal account is created (default password: PatientPass2026!).</p>
+                </div>
+
+                <div>
                   <label className="block text-slate-300 font-semibold mb-1">Known Drug Allergies</label>
                   <input
                     type="text"
                     value={patAllergies}
                     onChange={(e) => setPatAllergies(e.target.value)}
                     placeholder="e.g. Penicillin, Sulfa, Latex"
+                    className="w-full p-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-emerald-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-slate-300 font-semibold mb-1">Chronic Conditions</label>
+                  <input
+                    type="text"
+                    value={patChronic}
+                    onChange={(e) => setPatChronic(e.target.value)}
+                    placeholder="e.g. Asthma, Hypertension"
                     className="w-full p-2.5 rounded-xl bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
