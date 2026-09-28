@@ -24,7 +24,7 @@ class TestGraphStructure:
         compiled = builder.compile(checkpointer=MemorySaver())
         node_names = set(compiled.get_graph().nodes.keys())
         expected = {
-            "intake", "triage", "emergency", "questioner",
+            "intake", "memory_recall", "triage", "emergency", "questioner",
             "case_builder", "investigator", "interpreter",
             "diagnostician", "treatment", "increment_retry", "validator",
             "__start__",

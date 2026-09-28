@@ -114,6 +114,9 @@ class SessionStateResponse(BaseModel):
     # Multi-Agent Telemetry Breakdown for deep inspection
     agent_telemetry: dict[str, Any] | None = None
 
+    # What patient/agent memory informed this session (explainability)
+    memory_context: dict[str, Any] | None = None
+
 
 class QuestionResponse(BaseModel):
     """Response after accepting an answer."""

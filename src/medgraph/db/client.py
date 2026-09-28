@@ -120,6 +120,29 @@ class SupabaseDatabaseClient:
                 logger.error("[Supabase DB] HTTP %s request to %s failed: %s", method, table, exc)
                 return []
 
+    async def rpc(self, fn_name: str, params: dict[str, Any]) -> list[dict[str, Any]]:
+        """Call a Postgres function via PostgREST's ``/rest/v1/rpc/`` endpoint.
+
+        Used for pgvector cosine-similarity search (``match_local_memory`` /
+        ``match_global_memory`` in schema.sql) — PostgREST can't order by vector
+        distance directly, so the comparison has to happen inside a SQL function.
+        Returns ``[]`` on any failure (unconfigured, function not migrated yet,
+        etc.) so callers can fall straight back to keyword scoring.
+        """
+        if not self.is_configured:
+            return []
+
+        url = f"{self.supabase_url.rstrip('/')}/rest/v1/rpc/{fn_name}"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                res = await client.post(url, headers=self.headers, json=params)
+                res.raise_for_status()
+                data = res.json()
+                return data if isinstance(data, list) else [data]
+            except Exception as exc:
+                logger.debug("[Supabase DB] RPC %s failed (falling back to keyword scoring): %s", fn_name, exc)
+                return []
+
 
 # Global singleton instance
 _db_client_instance: SupabaseDatabaseClient | None = None

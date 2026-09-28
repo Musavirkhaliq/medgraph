@@ -225,6 +225,24 @@ def build_context_prompt(state: Mapping[str, Any], extra: str = "") -> str:
     if history:
         parts.append(f"=== MEDICAL HISTORY ===\n{json.dumps(history, indent=2)}")
 
+    patient_context = state.get("patient_context")
+    if patient_context:
+        parts.append(f"=== KNOWN PATIENT PROFILE ===\n{json.dumps(patient_context, indent=2)}")
+
+    history_snippets = state.get("patient_history_snippets")
+    if history_snippets:
+        parts.append(
+            "=== RELEVANT PAST VISITS (Patient Memory) ===\n"
+            + json.dumps(history_snippets, indent=2)
+        )
+
+    agent_knowledge = state.get("relevant_agent_knowledge")
+    if agent_knowledge:
+        parts.append(
+            "=== RELEVANT CLINICAL KNOWLEDGE (Cross-Patient Agent Memory) ===\n"
+            + json.dumps(agent_knowledge, indent=2)
+        )
+
     triage_level = state.get("triage_level")
     if triage_level:
         parts.append(

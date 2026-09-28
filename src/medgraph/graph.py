@@ -14,6 +14,9 @@ Graph layout
     [intake]
       │
       ▼
+    [memory_recall]  (loads patient profile/history + cross-patient agent knowledge)
+      │
+      ▼
     [triage] ──emergency──▶ [emergency] ──▶ END
       │
       │ continue
@@ -61,6 +64,7 @@ from medgraph.nodes.emergency import emergency_node
 from medgraph.nodes.intake import intake_node
 from medgraph.nodes.interpreter import interpreter_node
 from medgraph.nodes.investigator import investigator_node, investigator_router
+from medgraph.nodes.memory_recall import memory_recall_node
 from medgraph.nodes.memory_writer import appointment_memory_node
 from medgraph.nodes.questioner import questioner_node, questioner_router
 from medgraph.nodes.treatment import treatment_node
@@ -87,6 +91,7 @@ def build_graph() -> StateGraph:
 
     # ── Register nodes ─────────────────────────────────────────────────────────
     builder.add_node("intake", intake_node)
+    builder.add_node("memory_recall", memory_recall_node)
     builder.add_node("triage", triage_node)
     builder.add_node("emergency", emergency_node)
     builder.add_node("questioner", questioner_node)
@@ -101,7 +106,8 @@ def build_graph() -> StateGraph:
 
     # ── Entry edge ────────────────────────────────────────────────────────────
     builder.add_edge(START, "intake")
-    builder.add_edge("intake", "triage")
+    builder.add_edge("intake", "memory_recall")
+    builder.add_edge("memory_recall", "triage")
 
     # ── Triage router ─────────────────────────────────────────────────────────
     builder.add_conditional_edges(

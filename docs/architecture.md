@@ -72,7 +72,12 @@ class MedicalState(TypedDict, total=False):
 
     # Validation
     is_safe: bool
-    validation_warnings: Annotated[list[ValidationWarning], operator.add]
+    validation_warnings: list[ValidationWarning]   # replaced each validator pass, not appended
+
+    # Memory recall (loaded by memory_recall_node, right after intake)
+    patient_context: dict                          # allergies, chronic_conditions, current_medications
+    patient_history_snippets: list[dict]           # relevant past visits for this patient
+    relevant_agent_knowledge: list[dict]           # relevant cross-patient agent knowledge
 ```
 
 **Key design:** `Annotated[list, operator.add]` fields are *append-only* —
@@ -86,7 +91,8 @@ system thread-safe.
 ```mermaid
 flowchart TD
     START([__start__]) --> intake[intake_node]
-    intake --> triage[triage_node]
+    intake --> memory_recall[memory_recall_node]
+    memory_recall --> triage[triage_node]
     triage -->|emergency| emergency[emergency_node]
     triage -->|continue| questioner[questioner_node]
     emergency --> END([__end__])
@@ -115,6 +121,20 @@ flowchart TD
 **LLM config:** temperature=0.1, low tokens (facts only)
 
 Uses a strict Pydantic output schema to ensure consistent structured extraction.
+
+---
+
+### 1.5 `memory_recall_node`
+**Role:** Load per-patient and cross-patient memory into the session.
+
+Runs right after intake, before triage. Deterministic and LLM-free (like
+`emergency_node`), so it stays fast. If `patient_id` is set, loads the patient's
+clinical profile (allergies, chronic conditions, current medications) and the
+most relevant past visits from `local_patient_memory`. Always queries
+`global_agent_memory` for relevant cross-patient knowledge, even for a
+first-time patient. All of this is injected into every downstream node's prompt
+via `build_context_prompt`, and the allergy list feeds a deterministic safety
+check in `validator_node`. See **Memory Architecture** below.
 
 ---
 
@@ -200,7 +220,9 @@ as context and revises the plan accordingly.
 **Role:** Safety and consistency review.
 
 **Two layers:**
-1. Rule-based pre-check: missing follow-up, dangerous patterns, insulin without diabetes
+1. Rule-based pre-check: missing follow-up, dangerous patterns, insulin without diabetes,
+   and a deterministic allergy cross-check against `patient_context.allergies`
+   (loaded by `memory_recall_node`) — independent of the LLM's own judgment
 2. LLM review: drug interactions, contraindications, guideline compliance
 
 **Router:** `validator_router`
@@ -258,6 +280,61 @@ graph.ainvoke(None, config)  # resume
 
 ---
 
+## Memory Architecture
+
+MedGraph has a **dual-tier memory system** — per-patient and cross-patient — with
+both a write side (runs at session end) and a read side (runs at session start):
+
+| Tier | Table | Written by | Read by |
+|---|---|---|---|
+| Per-patient profile (entity memory) | `patients` | doctor registration | `memory_recall_node` |
+| Per-patient episodic memory | `local_patient_memory` | `appointment_memory_node` | `memory_recall_node` |
+| Cross-patient agent memory | `global_agent_memory` | `appointment_memory_node` | `memory_recall_node` |
+
+**Write side (`appointment_memory_node`, end of session):**
+- LOCAL memory: an LLM-generated, patient-scoped clinical summary of the completed visit.
+- GLOBAL memory: a de-identified diagnostic/treatment/safety pattern. `store_global_memory`
+  first checks for an existing similar-topic row of the same `knowledge_type`
+  (keyword-overlap ≥ 0.6) and **reinforces it** (increments `case_count`, blends
+  `confidence_score`) instead of inserting an unbounded duplicate row — this is how
+  the "agent-level" memory actually accumulates evidence over many cases rather than
+  just growing a flat log.
+
+**Read side (`memory_recall_node`, right after intake):**
+- Loads the patient's profile (allergies, chronic conditions, current medications)
+  and the most relevant past visits (`query_local_memory`).
+- Always queries cross-patient knowledge (`query_global_memory`), even for a
+  first-time patient — collective learning isn't gated on having a `patient_id`.
+- Everything is written into `patient_context` / `patient_history_snippets` /
+  `relevant_agent_knowledge`, then rendered into every downstream node's prompt by
+  `build_context_prompt` — so the whole pipeline (triage, questioner, case_builder,
+  diagnostician, treatment, validator) benefits from continuity of care and
+  cross-patient learning, not just the memory-writing step at the end.
+
+**Retrieval quality — semantic search with automatic fallback:**
+Both memory tables have `VECTOR(1536)` embedding columns. `medgraph.embeddings.get_embeddings()`
+returns a real embeddings client (Ollama's configured embedding model, or OpenAI's
+`text-embedding-3-small`) when one is configured, and `None` otherwise. When available,
+retrieval calls a pgvector cosine-similarity Postgres function (`match_local_memory` /
+`match_global_memory` in `supabase/schema.sql`) via a PostgREST RPC. Any failure —
+no provider configured, the RPC not migrated into Supabase yet, Supabase not
+configured at all — falls straight back to the original keyword-overlap scoring, so
+this is a strict enhancement with zero required configuration.
+
+**Deterministic safety net:** `patient_context.allergies` is cross-checked against
+prescribed medication names (and known drug families, e.g. penicillin → amoxicillin)
+in `safety.check_allergy_contraindications`, called from `validate_treatment_safety`.
+A match is `critical` severity and forces `is_safe=False` — this can never be missed
+purely because the LLM's own reasoning overlooked it, the same rule-first/LLM-second
+philosophy already used for emergency detection.
+
+**Deliberately not built (future work):** reflection/compaction of many old episodic
+entries into a single distilled per-patient trend summary; closed-loop treatment
+outcome tracking (this system doesn't yet capture whether a treatment worked);
+personalizing the questioner to skip things already known from history.
+
+---
+
 ## Directory Structure
 
 ```
@@ -267,6 +344,7 @@ medgraph/
 │   ├── config.py            # Pydantic-settings configuration
 │   ├── state.py             # MedicalState TypedDict
 │   ├── llm.py               # LLM factory (Ollama/OpenAI)
+│   ├── embeddings.py        # Embeddings factory (optional semantic memory retrieval)
 │   ├── prompts.py           # All system prompts
 │   ├── safety.py            # Rule-based safety validators
 │   ├── graph.py             # StateGraph builder + compiler
@@ -274,6 +352,7 @@ medgraph/
 │   ├── nodes/
 │   │   ├── _utils.py        # Shared parsing + context utilities
 │   │   ├── intake.py        # Intake node
+│   │   ├── memory_recall.py # Memory recall node (patient + agent memory)
 │   │   ├── triage.py        # Triage node + router
 │   │   ├── emergency.py     # Emergency node
 │   │   ├── questioner.py    # Q&A node + router

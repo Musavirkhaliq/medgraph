@@ -204,6 +204,20 @@ def _to_dict_safe(val: Any) -> Any:
     return val
 
 
+def _build_memory_context(state: MedicalState) -> dict[str, Any] | None:
+    """Summarise what patient/agent memory (memory_recall_node) informed this session."""
+    history = state.get("patient_history_snippets") or []
+    knowledge = state.get("relevant_agent_knowledge") or []
+    profile = state.get("patient_context") or {}
+    if not history and not knowledge and not profile:
+        return None
+    return {
+        "patient_profile_loaded": bool(profile),
+        "past_visits_used": [h.get("title") for h in history],
+        "agent_knowledge_used": [k.get("topic") for k in knowledge],
+    }
+
+
 def _build_agent_telemetry(state: MedicalState) -> dict[str, Any]:
     """Construct full 9-agent telemetry dictionary from state snapshot."""
     curr_phase = _current_phase(state)
@@ -364,6 +378,7 @@ async def get_session(session_id: str):
         validation_warnings=state.get("validation_warnings", []),
         validation_recommendations=state.get("validation_recommendations", []),
         agent_telemetry=agent_telemetry,
+        memory_context=_build_memory_context(state),
         message=f"Phase: {_current_phase(state)}",
     )
 

@@ -6,12 +6,13 @@ These tests mock the LLM to avoid requiring an actual Ollama/OpenAI connection.
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from medgraph.nodes._utils import build_context_prompt, parse_llm_json
 from medgraph.nodes.intake import IntakeResult, intake_node
+from medgraph.nodes.memory_recall import memory_recall_node
 from medgraph.nodes.questioner import QuestionResult, questioner_node, questioner_router
 from medgraph.nodes.triage import triage_node, triage_router
 from medgraph.nodes.validator import validator_node, validator_router
@@ -231,6 +232,103 @@ class TestValidatorNode:
         # Rule-based check should catch missing follow_up
         warnings = result["validation_warnings"]
         assert any("follow-up" in w.get("message", "").lower() for w in warnings)
+
+    def test_flags_known_allergy_even_if_llm_misses_it(self, post_triage_state):
+        """A documented allergy must be caught deterministically, independent of the LLM."""
+        state = {
+            **post_triage_state,
+            "patient_context": {"allergies": [{"allergen": "Penicillin"}]},
+            "medications": [{"name": "Amoxicillin", "dose": "500mg"}],
+            "procedures": [],
+            "follow_up": "Review in 1 week",
+            "monitoring": ["Symptom tracking"],
+        }
+        mock_response = MagicMock()
+        mock_response.content = """{
+            "is_safe": true,
+            "validation_warnings": [],
+            "validation_recommendations": [],
+            "overall_assessment": "Looks fine"
+        }"""
+        with patch("medgraph.nodes.validator.get_llm") as mock_llm:
+            mock_llm.return_value.invoke.return_value = mock_response
+            result = validator_node(state)
+
+        warnings = result["validation_warnings"]
+        assert any(w.get("severity") == "critical" for w in warnings)
+        assert result["is_safe"] is False
+
+
+class TestMemoryRecallNode:
+    """memory_recall_node loads per-patient and cross-patient memory into the session."""
+
+    @pytest.mark.asyncio
+    async def test_loads_profile_and_history_when_patient_id_present(self, post_intake_state):
+        state = {**post_intake_state, "patient_id": "pat-001"}
+
+        fake_profile = MagicMock(
+            allergies=[{"allergen": "Penicillin"}],
+            chronic_conditions=["Asthma"],
+            current_medications=["Albuterol"],
+            blood_type="O+",
+        )
+        fake_history_item = MagicMock(
+            title="Prior Asthma Visit", content="Responded to nebulizer.",
+            memory_category="episodic_visit", created_at="2025-01-01T00:00:00Z",
+        )
+        fake_knowledge_item = MagicMock(
+            topic="Asthma Pattern", summary="Common presentation.",
+            knowledge_type="diagnostic_pattern", confidence_score=0.9,
+        )
+
+        mock_mgr = MagicMock()
+        mock_mgr.query_local_memory = AsyncMock(return_value=[fake_history_item])
+        mock_mgr.query_global_memory = AsyncMock(return_value=[fake_knowledge_item])
+
+        with (
+            patch("medgraph.db.memory_manager.get_memory_manager", return_value=mock_mgr),
+            patch("medgraph.db.repository.get_patient_by_account_id", AsyncMock(return_value=fake_profile)),
+        ):
+            result = await memory_recall_node(state)
+
+        assert result["patient_context"]["allergies"] == [{"allergen": "Penicillin"}]
+        assert result["patient_history_snippets"][0]["title"] == "Prior Asthma Visit"
+        assert result["relevant_agent_knowledge"][0]["topic"] == "Asthma Pattern"
+
+    @pytest.mark.asyncio
+    async def test_no_patient_id_returns_empty_defaults_without_error(self, post_intake_state):
+        state = {**post_intake_state, "patient_id": None}
+
+        mock_mgr = MagicMock()
+        mock_mgr.query_local_memory = AsyncMock(return_value=[])
+        mock_mgr.query_global_memory = AsyncMock(return_value=[])
+
+        with patch("medgraph.db.memory_manager.get_memory_manager", return_value=mock_mgr):
+            result = await memory_recall_node(state)
+
+        assert result["patient_context"] == {}
+        assert result["patient_history_snippets"] == []
+        mock_mgr.query_local_memory.assert_not_called()
+        mock_mgr.query_global_memory.assert_called_once()
+
+    @pytest.mark.asyncio
+    async def test_manager_failure_is_non_fatal(self, post_intake_state):
+        state = {**post_intake_state, "patient_id": "pat-001"}
+
+        mock_mgr = MagicMock()
+        mock_mgr.query_local_memory = AsyncMock(side_effect=RuntimeError("db down"))
+        mock_mgr.query_global_memory = AsyncMock(side_effect=RuntimeError("db down"))
+
+        with (
+            patch("medgraph.db.memory_manager.get_memory_manager", return_value=mock_mgr),
+            patch("medgraph.db.repository.get_patient_by_account_id", AsyncMock(side_effect=RuntimeError("db down"))),
+            patch("medgraph.db.repository.get_patient_by_mrn_or_id", AsyncMock(return_value=None)),
+        ):
+            result = await memory_recall_node(state)  # must not raise
+
+        assert result["patient_history_snippets"] == []
+        assert result["relevant_agent_knowledge"] == []
+        assert len(result.get("node_errors", [])) > 0
 
 
 class TestValidatorRouter:
