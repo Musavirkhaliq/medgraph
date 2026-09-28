@@ -132,11 +132,48 @@ CREATE INDEX IF NOT EXISTS idx_followups_due_date ON public.patient_followups(du
 CREATE INDEX IF NOT EXISTS idx_local_mem_patient_id ON public.local_patient_memory(patient_id);
 
 -- Vector indexes using IVFFlat (or HNSW)
-CREATE INDEX IF NOT EXISTS local_mem_vector_idx 
+CREATE INDEX IF NOT EXISTS local_mem_vector_idx
 ON public.local_patient_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
-CREATE INDEX IF NOT EXISTS global_mem_vector_idx 
+CREATE INDEX IF NOT EXISTS global_mem_vector_idx
 ON public.global_agent_memory USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+-- ============================================================================
+-- SEMANTIC MEMORY RETRIEVAL (pgvector cosine similarity via RPC)
+-- PostgREST can't order by vector distance directly, so retrieval goes through
+-- these functions. Called from db/client.py's rpc() helper; the Python layer
+-- falls back to keyword-overlap scoring automatically if these aren't present
+-- yet or no embedding is available for a query.
+-- ============================================================================
+CREATE OR REPLACE FUNCTION match_local_memory(
+    query_embedding VECTOR(1536),
+    match_patient_id UUID,
+    match_count INT DEFAULT 5
+)
+RETURNS SETOF public.local_patient_memory
+LANGUAGE sql STABLE
+AS $$
+    SELECT *
+    FROM public.local_patient_memory
+    WHERE patient_id = match_patient_id
+      AND embedding IS NOT NULL
+    ORDER BY embedding <=> query_embedding
+    LIMIT match_count;
+$$;
+
+CREATE OR REPLACE FUNCTION match_global_memory(
+    query_embedding VECTOR(1536),
+    match_count INT DEFAULT 5
+)
+RETURNS SETOF public.global_agent_memory
+LANGUAGE sql STABLE
+AS $$
+    SELECT *
+    FROM public.global_agent_memory
+    WHERE embedding IS NOT NULL
+    ORDER BY embedding <=> query_embedding
+    LIMIT match_count;
+$$;
 
 -- ============================================================================
 -- ROW LEVEL SECURITY (RLS) POLICIES

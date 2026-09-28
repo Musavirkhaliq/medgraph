@@ -185,6 +185,36 @@ class TestGlobalMemory:
             assert term not in item.summary, f"PII term '{term}' found in global memory summary!"
             assert term not in item.topic, f"PII term '{term}' found in global memory topic!"
 
+    @pytest.mark.asyncio
+    async def test_similar_topic_consolidates_instead_of_duplicating(self, mem_mgr):
+        """A near-duplicate finding reinforces the existing row rather than adding a new one."""
+        unique_word = uuid.uuid4().hex[:8]
+        first = await mem_mgr.store_global_memory(
+            topic=f"NSAID GI Bleeding Risk {unique_word} Elderly Patients",
+            summary="NSAIDs raise GI bleeding risk in elderly patients on anticoagulants.",
+            knowledge_type="safety_anomaly",
+            confidence_score=0.7,
+        )
+        second = await mem_mgr.store_global_memory(
+            topic=f"NSAID GI Bleeding Risk {unique_word} Elderly Patients",
+            summary="Confirmed again: NSAIDs raise GI bleeding risk in elderly patients on anticoagulants.",
+            knowledge_type="safety_anomaly",
+            confidence_score=0.9,
+        )
+        assert second.id == first.id
+        assert second.case_count == 2
+
+    @pytest.mark.asyncio
+    async def test_dissimilar_topic_creates_new_row(self, mem_mgr):
+        """An unrelated topic is stored as its own row, not merged into anything."""
+        unique_word = uuid.uuid4().hex[:8]
+        item = await mem_mgr.store_global_memory(
+            topic=f"Totally Unrelated Dermatology Finding {unique_word}",
+            summary="Contact dermatitis pattern unrelated to any existing entry.",
+            knowledge_type="symptom_cluster",
+        )
+        assert item.case_count == 1
+
 
 # ── 3. APPOINTMENT SUMMARY ────────────────────────────────────────────────────
 
@@ -368,4 +398,35 @@ class TestAppointmentMemoryNode:
         assert "global_memory_id" in result
         assert result["local_memory_id"] is not None
         assert result["global_memory_id"] is not None
+
+
+# ── 7. EMBEDDINGS FALLBACK ────────────────────────────────────────────────────
+
+class TestEmbeddingsFallback:
+    """No embedding provider is configured in this test environment — retrieval
+    must transparently fall back to keyword scoring rather than erroring."""
+
+    @pytest.mark.asyncio
+    async def test_get_embeddings_returns_none_without_provider(self):
+        from medgraph.embeddings import get_embeddings
+
+        get_embeddings.cache_clear()
+        assert get_embeddings() is None
+
+    @pytest.mark.asyncio
+    async def test_embed_text_returns_none_and_keyword_search_still_works(self, mem_mgr):
+        from medgraph.embeddings import embed_text
+
+        assert await embed_text("chest pain and dyspnea") is None
+
+        # query_local_memory must still return relevant results via keyword scoring.
+        await mem_mgr.store_local_memory(
+            patient_id=TEST_PATIENT_ID,
+            title="Embeddings Fallback Check",
+            content="Patient reports chest pain and dyspnea on exertion.",
+        )
+        results = await mem_mgr.query_local_memory(
+            patient_id=TEST_PATIENT_ID, query_text="chest pain dyspnea", limit=5
+        )
+        assert any(r.title == "Embeddings Fallback Check" for r in results)
 

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     openai_fallback_model: str = "gpt-4o-mini"
     llm_provider: Literal["auto", "ollama", "openai"] = "auto"
 
+    # ── Embeddings (optional — semantic memory retrieval) ───────────────────
+    embedding_provider: Literal["auto", "ollama", "openai", "none"] = "auto"
+    embedding_model: str = "nomic-embed-text"
+
     # ── API Server ────────────────────────────────────────────────────────────
     api_host: str = "0.0.0.0"
     api_port: int = 8000

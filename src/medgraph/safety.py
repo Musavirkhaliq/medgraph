@@ -56,6 +56,81 @@ _URGENT_KEYWORDS: list[str] = [
     "sudden numbness",
 ]
 
+# ── Allergen → drug-family map (for deterministic allergy cross-checking) ────
+
+_ALLERGY_DRUG_FAMILIES: dict[str, list[str]] = {
+    "penicillin": ["penicillin", "amoxicillin", "ampicillin", "augmentin", "piperacillin"],
+    "amoxicillin": ["penicillin", "amoxicillin", "ampicillin", "augmentin", "piperacillin"],
+    "cephalosporin": ["cephalexin", "ceftriaxone", "cefuroxime", "cefazolin", "cefdinir"],
+    "sulfa": ["sulfamethoxazole", "bactrim", "sulfasalazine", "sulfadiazine"],
+    "sulfonamide": ["sulfamethoxazole", "bactrim", "sulfasalazine", "sulfadiazine"],
+    "nsaid": ["ibuprofen", "naproxen", "aspirin", "diclofenac", "ketorolac", "celecoxib"],
+    "aspirin": ["aspirin"],
+    "ibuprofen": ["ibuprofen"],
+    "latex": [],
+    "codeine": ["codeine"],
+    "opioid": ["codeine", "morphine", "oxycodone", "tramadol"],
+}
+
+
+def _extract_allergen_names(allergies: list[Any]) -> list[str]:
+    """Normalize a patient's stored allergy list into lowercase allergen names.
+
+    Handles both plain strings and ``{"allergen": ...}`` dicts (the shape used
+    by the patient repository and admin registration form).
+    """
+    names: list[str] = []
+    for a in allergies or []:
+        if isinstance(a, dict):
+            name = a.get("allergen") or a.get("name") or ""
+        else:
+            name = str(a)
+        name = name.strip().lower()
+        if name:
+            names.append(name)
+    return names
+
+
+def check_allergy_contraindications(
+    medications: list[dict[str, Any]], known_allergies: list[Any]
+) -> list[dict[str, str]]:
+    """
+    Deterministically cross-check prescribed medications against a patient's
+    documented allergies — a hard safety net independent of LLM judgment.
+
+    Args:
+        medications: Treatment plan medications (each with a ``name`` field).
+        known_allergies: The patient's stored allergy list (strings or dicts).
+
+    Returns:
+        List of warning dicts (``severity="critical"``) for any match.
+    """
+    allergen_names = _extract_allergen_names(known_allergies)
+    if not allergen_names:
+        return []
+
+    warnings: list[dict[str, str]] = []
+    for med in medications:
+        if not isinstance(med, dict):
+            continue
+        med_name = str(med.get("name", "")).lower()
+        if not med_name:
+            continue
+        for allergen in allergen_names:
+            family_drugs = _ALLERGY_DRUG_FAMILIES.get(allergen, [allergen])
+            if allergen in med_name or any(drug in med_name for drug in family_drugs):
+                warnings.append({
+                    "severity": "critical",
+                    "message": (
+                        f"'{med.get('name')}' may be contraindicated — patient has a "
+                        f"documented '{allergen}' allergy."
+                    ),
+                })
+                break
+
+    return warnings
+
+
 # ── Dangerous recommendation patterns ─────────────────────────────────────────
 
 _DANGEROUS_PATTERNS: list[str] = [
@@ -115,7 +190,9 @@ def detect_emergency(text: str) -> dict[str, Any]:
     }
 
 
-def validate_treatment_safety(treatment: dict[str, Any]) -> list[dict[str, str]]:
+def validate_treatment_safety(
+    treatment: dict[str, Any], known_allergies: list[Any] | None = None
+) -> list[dict[str, str]]:
     """
     Rule-based pre-flight safety check on a treatment plan.
 
@@ -123,12 +200,19 @@ def validate_treatment_safety(treatment: dict[str, Any]) -> list[dict[str, str]]
 
     Args:
         treatment: Treatment plan dict (medications, procedures, follow_up, etc.)
+        known_allergies: The patient's documented allergies (from patient_context),
+            cross-checked deterministically against prescribed medications.
 
     Returns:
         List of warning dicts with keys ``severity`` and ``message``.
     """
     warnings: list[dict[str, str]] = []
     text = str(treatment).lower()
+
+    if known_allergies:
+        warnings.extend(
+            check_allergy_contraindications(treatment.get("medications", []), known_allergies)
+        )
 
     for pattern in _DANGEROUS_PATTERNS:
         if re.search(pattern, text, re.IGNORECASE):

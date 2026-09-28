@@ -150,8 +150,16 @@ class MedicalState(TypedDict, total=False):
 
     # ── Safety validation ────────────────────────────────────────────────────
     is_safe: bool
-    validation_warnings: Annotated[list[ValidationWarning], operator.add]
+    # Not append-only: each validator pass re-evaluates the current treatment
+    # plan from scratch, so this must be a fresh replacement each time rather
+    # than accumulating stale warnings from earlier, now-revised retries.
+    validation_warnings: list[ValidationWarning]
     validation_recommendations: list[str]
+
+    # ── Memory recall (set by memory_recall_node, right after intake) ──────────
+    patient_context: dict[str, Any]                  # profile facts: allergies, chronic_conditions, current_medications, blood_type
+    patient_history_snippets: list[dict[str, Any]]    # relevant past local memories for this patient
+    relevant_agent_knowledge: list[dict[str, Any]]    # relevant cross-patient global agent memory
 
     # ── Memory IDs (set by appointment_memory_node after session completes) ───────────
     patient_id: str | None          # patient UUID for memory association
@@ -216,6 +224,9 @@ def initial_state(session_id: str, patient_input: str) -> MedicalState:
         validation_recommendations=[],
         error=None,
         node_errors=[],
+        patient_context={},
+        patient_history_snippets=[],
+        relevant_agent_knowledge=[],
         patient_id=None,
         local_memory_id=None,
         global_memory_id=None,

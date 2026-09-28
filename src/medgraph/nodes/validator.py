@@ -63,7 +63,8 @@ def validator_node(state: MedicalState) -> dict:
         "follow_up": state.get("follow_up", ""),
         "monitoring": state.get("monitoring", []),
     }
-    rule_warnings = validate_treatment_safety(treatment_dict)
+    known_allergies = state.get("patient_context", {}).get("allergies", [])
+    rule_warnings = validate_treatment_safety(treatment_dict, known_allergies=known_allergies)
 
     # ── Layer 2: LLM-based review ─────────────────────────────────────────────
     context = build_context_prompt(state)

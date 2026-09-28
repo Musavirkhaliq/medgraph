@@ -280,8 +280,10 @@ def clean_text_for_speech(text: str) -> str:
 
     # Remove HTML tags
     cleaned = re.sub(r"<[^>]*>", "", text)
-    # Remove ICD codes (e.g. J45.909) if needed or format them cleanly
-    cleaned = re.sub(r"\[ICD-10:[^\]]+\]", "", cleaned)
+    # Remove ICD codes (e.g. J45.909), whether bracketed "[ICD-10:J45.909]"
+    # or parenthesized "(ICD-10 J45.909)" — the latter is what the app
+    # actually produces in diagnosis text.
+    cleaned = re.sub(r"[\[(]ICD-10:?\s*[^\])]*[\])]", "", cleaned, flags=re.IGNORECASE)
     # Remove markdown bullets and header hashes
     cleaned = re.sub(r"^[#*\-•>]+\s*", "", cleaned, flags=re.MULTILINE)
     # Replace markdown bold/italic asterisks

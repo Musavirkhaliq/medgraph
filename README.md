@@ -33,6 +33,9 @@ START
 [intake] → extract demographics, symptoms, history
   │
   ▼
+[memory_recall] → load patient profile/history + cross-patient agent knowledge
+  │
+  ▼
 [triage] → assess urgency (2-layer: rule-based + LLM)
   │
   ├─ emergency ──→ [emergency] ──→ END (immediate guidance)

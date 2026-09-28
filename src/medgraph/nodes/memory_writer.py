@@ -66,8 +66,13 @@ async def appointment_memory_node(state: MedicalState) -> dict:
     logger.info("[memory_writer] Generating appointment memory for session %s", session_id)
 
     context = build_context_prompt(state)
-    llm = get_llm("general")
     mem_mgr = get_memory_manager()
+
+    try:
+        llm = get_llm("general")
+    except Exception as exc:
+        logger.warning("[memory_writer] LLM unavailable, using structured state fallback for all steps: %s", exc)
+        llm = None
 
     local_memory_id: str | None = None
     global_memory_id: str | None = None
@@ -76,6 +81,8 @@ async def appointment_memory_node(state: MedicalState) -> dict:
 
     # ── Step 1: Generate LOCAL patient memory summary ─────────────────────────
     try:
+        if llm is None:
+            raise RuntimeError("No LLM provider available")
         local_messages = [
             SystemMessage(content=LOCAL_MEMORY_SUMMARY_SYSTEM),
             HumanMessage(
@@ -145,6 +152,8 @@ async def appointment_memory_node(state: MedicalState) -> dict:
 
     # ── Step 2: Generate GLOBAL de-identified memory summary ──────────────────
     try:
+        if llm is None:
+            raise RuntimeError("No LLM provider available")
         global_messages = [
             SystemMessage(content=GLOBAL_MEMORY_SUMMARY_SYSTEM),
             HumanMessage(

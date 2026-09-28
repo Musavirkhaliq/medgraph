@@ -20,8 +20,9 @@ export default function ClinicalMemoryModal({ isOpen, onClose, patient }) {
           getGlobalMemory().catch(() => null)
         ]);
 
-        if (timelineData && Array.isArray(timelineData) && timelineData.length > 0) {
-          setLocalMems(timelineData);
+        const timeline = timelineData?.timeline;
+        if (Array.isArray(timeline) && timeline.length > 0) {
+          setLocalMems(timeline);
         } else {
           // Default baseline memory fallback
           setLocalMems([
@@ -44,8 +45,9 @@ export default function ClinicalMemoryModal({ isOpen, onClose, patient }) {
           ]);
         }
 
-        if (globalData && Array.isArray(globalData) && globalData.length > 0) {
-          setGlobalMems(globalData);
+        const globalMemories = globalData?.global_memories;
+        if (Array.isArray(globalMemories) && globalMemories.length > 0) {
+          setGlobalMems(globalMemories);
         } else {
           setGlobalMems([
             {

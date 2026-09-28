@@ -87,8 +87,8 @@ export default function AdminDashboard({ onBackToHub }) {
     const mrn = `MRN-2026-${Math.floor(1000 + Math.random() * 9000)}`;
     try {
       await registerPatient({
-        name: patName,
-        dob: patDob,
+        full_name: patName,
+        date_of_birth: patDob,
         gender: patGender,
         mrn: mrn,
         email: patEmail,

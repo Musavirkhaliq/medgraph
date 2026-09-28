@@ -56,7 +56,7 @@ export async function submitTestResults(sessionId, { results = "", skipped = fal
   const res = await fetch(`${API_BASE}/sessions/${sessionId}/test_results`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ results, skipped }),
+    body: JSON.stringify({ text_results: results, skipped }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
@@ -137,7 +137,7 @@ export async function loginUser(email, password) {
 
 export async function searchPatients(query = "") {
   try {
-    const res = await fetch(`${API_BASE}/patients/search?q=${encodeURIComponent(query)}`);
+    const res = await fetch(`${API_BASE}/patients/search?query=${encodeURIComponent(query)}`);
     if (res.ok) return await res.json();
   } catch (e) {
     console.warn("Search patients API unavailable, fallback:", e);
@@ -176,7 +176,7 @@ export async function getPatientMemoryTimeline(patientId) {
 }
 
 export async function addInterimNote(patientId, { note, doctorId = null, sessionId = null, patientName = null }) {
-  const res = await fetch(`${API_BASE}/patients/${patientId}/interim-notes`, {
+  const res = await fetch(`${API_BASE}/patients/${patientId}/interim-note`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -195,7 +195,7 @@ export async function addInterimNote(patientId, { note, doctorId = null, session
 
 export async function getSessionSummary(sessionId) {
   try {
-    const res = await fetch(`${API_BASE}/sessions/${sessionId}/summary`);
+    const res = await fetch(`${API_BASE}/sessions/${sessionId}/appointment-summary`);
     if (res.ok) return await res.json();
   } catch (e) {
     console.warn("Session summary API fallback:", e);

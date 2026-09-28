@@ -129,8 +129,10 @@ class DualTierMemoryManager:
             doctor_id: Doctor's user ID if note_type == 'interim_note'.
         """
         from medgraph.db.client import to_uuid_safe
+        from medgraph.embeddings import embed_text
+
         mem_id = str(uuid.uuid4())
-        item_dict = {
+        item_dict: dict[str, Any] = {
             "id": mem_id,
             "patient_id": to_uuid_safe(patient_id),
             "session_id": session_id,
@@ -143,6 +145,9 @@ class DualTierMemoryManager:
             "metadata": metadata or {},
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
+        embedding = await embed_text(f"{title}\n{content}")
+        if embedding is not None:
+            item_dict["embedding"] = embedding
 
         if self.db_client.is_configured:
             await self.db_client.ensure_patient_exists(patient_id)
@@ -167,6 +172,22 @@ class DualTierMemoryManager:
         _local_memories_db.append(item_dict)
         return _safe_local_item(item_dict)
 
+    async def _touch_last_accessed(self, table: str, rows: list[dict[str, Any]]) -> None:
+        """Best-effort ``last_accessed_at`` bump for retrieved rows (never raises)."""
+        if not self.db_client.is_configured:
+            return
+        ids = [r["id"] for r in rows if r.get("id")]
+        if not ids:
+            return
+        try:
+            await self.db_client.rest_request(
+                "PATCH", table,
+                params={"id": f"in.({','.join(ids)})"},
+                json_data={"last_accessed_at": datetime.now(timezone.utc).isoformat()},
+            )
+        except Exception as exc:
+            logger.debug("[MemoryManager] last_accessed_at bump failed (non-fatal): %s", exc)
+
     async def query_local_memory(
         self,
         patient_id: str,
@@ -175,9 +196,29 @@ class DualTierMemoryManager:
     ) -> list[LocalPatientMemoryItem]:
         """Query local memories for a patient, ordered by relevance/recency."""
         from medgraph.db.client import to_uuid_safe
+        from medgraph.embeddings import embed_text
+
         pid_uuid = to_uuid_safe(patient_id)
 
         if self.db_client.is_configured:
+            # Prefer real semantic search when an embedding provider is
+            # configured; any failure (no provider, RPC not migrated yet)
+            # falls straight through to the keyword-scored path below.
+            if query_text:
+                query_embedding = await embed_text(query_text)
+                if query_embedding is not None:
+                    rpc_rows = await self.db_client.rpc(
+                        "match_local_memory",
+                        {
+                            "query_embedding": query_embedding,
+                            "match_patient_id": pid_uuid,
+                            "match_count": limit,
+                        },
+                    )
+                    if rpc_rows:
+                        await self._touch_last_accessed("local_patient_memory", rpc_rows)
+                        return [_safe_local_item(r) for r in rpc_rows]
+
             rows = await self.db_client.rest_request(
                 "GET", "local_patient_memory",
                 params={
@@ -193,6 +234,7 @@ class DualTierMemoryManager:
                 except Exception:
                     pass
             if results:
+                await self._touch_last_accessed("local_patient_memory", rows)
                 return results
 
         # Fallback: in-memory search
@@ -218,6 +260,27 @@ class DualTierMemoryManager:
 
     # ── GLOBAL MEMORY ─────────────────────────────────────────────────────────
 
+    async def _find_similar_global_memory(
+        self, topic: str, knowledge_type: str, threshold: float = 0.6
+    ) -> dict[str, Any] | None:
+        """Find an existing global memory row similar enough to consolidate into."""
+        candidates: list[dict[str, Any]] = []
+        if self.db_client.is_configured:
+            rows = await self.db_client.rest_request(
+                "GET", "global_agent_memory",
+                params={"knowledge_type": f"eq.{knowledge_type}", "limit": "50"},
+            )
+            candidates = list(rows)
+        if not candidates:
+            candidates = [m for m in _global_memories_db if m.get("knowledge_type") == knowledge_type]
+
+        best_score, best_row = 0.0, None
+        for row in candidates:
+            score = _compute_keyword_score(row.get("topic", ""), topic)
+            if score > best_score:
+                best_score, best_row = score, row
+        return best_row if best_score >= threshold else None
+
     async def store_global_memory(
         self,
         topic: str,
@@ -226,7 +289,19 @@ class DualTierMemoryManager:
         pattern_graph: dict[str, Any] | None = None,
         confidence_score: float = 0.85,
     ) -> GlobalAgentMemoryItem:
-        """Store de-identified cross-patient clinical knowledge."""
+        """
+        Store de-identified cross-patient clinical knowledge.
+
+        If an existing memory with the same ``knowledge_type`` and a similar
+        ``topic`` is found, it's reinforced (case_count incremented, confidence
+        blended) rather than inserted as a new, unbounded duplicate row.
+        """
+        existing = await self._find_similar_global_memory(topic, knowledge_type)
+        if existing:
+            return await self._reinforce_global_memory(existing, summary, pattern_graph, confidence_score)
+
+        from medgraph.embeddings import embed_text
+
         gmem_id = str(uuid.uuid4())
         item_dict = {
             "id": gmem_id,
@@ -238,6 +313,9 @@ class DualTierMemoryManager:
             "pattern_graph": pattern_graph or {},
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
+        embedding = await embed_text(f"{topic}\n{summary}")
+        if embedding is not None:
+            item_dict["embedding"] = embedding
 
         if self.db_client.is_configured:
             try:
@@ -260,13 +338,79 @@ class DualTierMemoryManager:
         _global_memories_db.append(item_dict)
         return _safe_global_item(item_dict)
 
+    async def _reinforce_global_memory(
+        self,
+        existing: dict[str, Any],
+        new_summary: str,
+        new_pattern_graph: dict[str, Any] | None,
+        new_confidence: float,
+    ) -> GlobalAgentMemoryItem:
+        """Increment case_count and blend confidence into an existing global memory row."""
+        old_count = existing.get("case_count", 1)
+        old_confidence = existing.get("confidence_score", 0.5)
+        new_count = old_count + 1
+        # Weighted average favoring the larger, more-established sample.
+        blended_confidence = round(
+            (old_confidence * old_count + new_confidence) / new_count, 3
+        )
+
+        updates: dict[str, Any] = {
+            "case_count": new_count,
+            "confidence_score": blended_confidence,
+        }
+        # Only replace the narrative summary if this case is more confident than
+        # the consolidated average — keeps the most authoritative wording.
+        if new_confidence >= blended_confidence:
+            updates["summary"] = new_summary
+            if new_pattern_graph:
+                updates["pattern_graph"] = new_pattern_graph
+
+        gmem_id = existing.get("id")
+        if self.db_client.is_configured and gmem_id:
+            try:
+                await self.db_client.rest_request(
+                    "PATCH", "global_agent_memory",
+                    params={"id": f"eq.{gmem_id}"},
+                    json_data=updates,
+                )
+                logger.info(
+                    "[MemoryManager] ✅ Reinforced global memory %s (case_count=%d)",
+                    gmem_id, new_count,
+                )
+            except Exception as exc:
+                logger.warning("[MemoryManager] Supabase global reinforce failed: %s", exc)
+
+        for row in _global_memories_db:
+            if row.get("id") == gmem_id:
+                row.update(updates)
+                break
+        else:
+            # Row only existed in Supabase (not in the local fallback list) — merge it in.
+            merged = {**existing, **updates}
+            _global_memories_db.append(merged)
+            existing = merged
+
+        return _safe_global_item({**existing, **updates})
+
     async def query_global_memory(
         self,
         query_text: str = "",
         limit: int = 5,
     ) -> list[GlobalAgentMemoryItem]:
         """Query global cross-patient agent memory."""
+        from medgraph.embeddings import embed_text
+
         if self.db_client.is_configured:
+            if query_text:
+                query_embedding = await embed_text(query_text)
+                if query_embedding is not None:
+                    rpc_rows = await self.db_client.rpc(
+                        "match_global_memory",
+                        {"query_embedding": query_embedding, "match_count": limit},
+                    )
+                    if rpc_rows:
+                        return [_safe_global_item(r) for r in rpc_rows]
+
             rows = await self.db_client.rest_request(
                 "GET", "global_agent_memory",
                 params={"order": "created_at.desc", "limit": str(limit)},

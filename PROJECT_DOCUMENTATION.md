@@ -72,6 +72,9 @@ The system was originally a monolithic CrewAI-based system. MedGraph is a comple
                             │   [intake] → Extract: demographics, symptoms,       │
                             │     │         history from free-text                │
                             │     ▼                                               │
+                            │  [memory_recall] → Load patient profile/history +   │
+                            │     │              cross-patient agent knowledge    │
+                            │     ▼                                               │
                             │   [triage] → Assess urgency: emergency/urgent/      │
                             │     │         routine (2-layer: rule + LLM)         │
                             │     │                                               │
@@ -189,6 +192,7 @@ medgraph/
 │       ├── config.py                 <- Centralised pydantic-settings configuration
 │       ├── state.py                  <- MedicalState TypedDict (session schema)
 │       ├── llm.py                    <- LLM factory: Ollama / OpenAI auto-detection
+│       ├── embeddings.py             <- Embeddings factory (optional semantic memory retrieval)
 │       ├── prompts.py                <- All system & user-facing prompts (centralized)
 │       ├── safety.py                 <- Rule-based emergency detection & treatment checks
 │       ├── graph.py                  <- LangGraph StateGraph builder + compiler
@@ -196,6 +200,7 @@ medgraph/
 │       ├── nodes/                    <- One file per graph node
 │       │   ├── _utils.py             <- Shared: parse_llm_json(), build_context_prompt()
 │       │   ├── intake.py             <- Node 1: Structured patient data extraction
+│       │   ├── memory_recall.py      <- Node 1.5: Load patient + agent memory into the session
 │       │   ├── triage.py             <- Node 2: Urgency assessment + triage_router
 │       │   ├── emergency.py          <- Node 3: Emergency guidance (early exit)
 │       │   ├── questioner.py         <- Node 4: Adaptive Q&A + questioner_router
@@ -266,7 +271,8 @@ Every piece of data flowing through the graph lives in a single `MedicalState` T
 | Image Interpretation | `image_paths` (append), `image_analysis` | interpreter_node |
 | Diagnosis | `differential_diagnosis`, `primary_diagnosis`, `diagnosis_confidence` | diagnostician_node |
 | Treatment | `medications`, `procedures`, `lifestyle_modifications`, `follow_up`, `monitoring`, `treatment_retry_count` | treatment_node |
-| Safety Validation | `is_safe`, `validation_warnings` (append), `validation_recommendations` | validator_node |
+| Safety Validation | `is_safe`, `validation_warnings`, `validation_recommendations` | validator_node |
+| Memory Recall | `patient_context`, `patient_history_snippets`, `relevant_agent_knowledge` | memory_recall_node |
 | Memory IDs | `patient_id`, `local_memory_id`, `global_memory_id` | memory_writer |
 | Errors | `error`, `node_errors` (append) | any node |
 
@@ -351,6 +357,29 @@ All nodes call `get_llm(task_type)` — a single factory function. It auto-detec
 **Prompt rules:** Extract ONLY what is explicitly stated — never infer. Return valid JSON. Use null for absent fields.
 
 **Error handling:** Returns empty structures, logs to `node_errors`. Pipeline continues.
+
+---
+
+### Node 1.5: Memory Recall (`memory_recall_node`)
+**File:** `src/medgraph/nodes/memory_recall.py`
+
+**Role:** Load per-patient and cross-patient memory into the session, closing the
+loop with `memory_writer` — without this node, both memory tiers are write-only.
+
+**Process:** Deterministic, no LLM call (same reasoning as `emergency_node`). If
+`state["patient_id"]` is set, loads the patient's clinical profile (allergies,
+chronic conditions, current medications) via the patient repository, and the most
+relevant past visits via `DualTierMemoryManager.query_local_memory`. Always queries
+`query_global_memory` for relevant cross-patient knowledge — this applies even to a
+first-time patient with no `patient_id`.
+
+**Output:** `patient_context`, `patient_history_snippets`, `relevant_agent_knowledge`
+— all three are rendered into every downstream node's prompt via
+`build_context_prompt`, and `patient_context.allergies` feeds a deterministic
+safety check in `validator_node` (see §8 and §15).
+
+**Error handling:** Any DB/lookup failure is caught and logged to `node_errors`;
+returns empty defaults. Never blocks the pipeline.
 
 ---
 
@@ -618,10 +647,14 @@ avoid hospital
 do not seek medical
 ```
 
-### `validate_treatment_safety(treatment)` Checks
+### `validate_treatment_safety(treatment, known_allergies)` Checks
 - Missing `follow_up` → medium severity warning
 - No `monitoring` → medium severity warning
 - Insulin without diabetes context in text → high severity warning
+- `known_allergies` (from `patient_context`, loaded by `memory_recall_node`) cross-checked
+  against prescribed medication names and known drug families (e.g. penicillin allergy →
+  flags amoxicillin/ampicillin/augmentin) via `check_allergy_contraindications` →
+  **critical** severity warning, independent of the LLM's own judgment
 
 ### Disclaimer System
 - `MEDICAL_DISCLAIMER`: Appended to all API responses and CLI reports
@@ -966,18 +999,36 @@ The `DualTierMemoryManager` class provides high-level CRUD for all memory operat
 
 | Method | Description |
 |---|---|
-| `store_local_memory(patient_id, title, content, memory_category, ...)` | Save local patient memory to Supabase |
-| `get_local_memories(patient_id, query, limit)` | Retrieve patient memories, scored by keyword relevance |
-| `store_global_memory(topic, summary, knowledge_type, pattern_graph, ...)` | Save global knowledge item |
-| `get_global_memories(query, limit)` | Retrieve global knowledge records |
+| `store_local_memory(patient_id, title, content, memory_category, ...)` | Save local patient memory to Supabase (embeds it if an embedding provider is configured) |
+| `query_local_memory(patient_id, query_text, limit)` | Retrieve patient memories — semantic search if embeddings available, else keyword relevance |
+| `store_global_memory(topic, summary, knowledge_type, pattern_graph, ...)` | Save global knowledge item — reinforces (increments `case_count`, blends `confidence_score`) an existing similar-topic row instead of inserting a duplicate |
+| `query_global_memory(query_text, limit)` | Retrieve global knowledge records — semantic search if embeddings available, else keyword relevance |
 | `store_appointment_summary(session_id, patient_id, ...)` | Create appointment summary linking both memory tiers |
-| `add_interim_note(patient_id, note, doctor_id, ...)` | Doctor note → LLM-summarised → stored as local memory |
+| `store_interim_note(patient_id, raw_note, doctor_id, ...)` | Doctor note → LLM-summarised → stored as local memory |
+
+**Read side (closing the loop):** `memory_recall_node` (§6, Node 1.5) calls
+`query_local_memory` and `query_global_memory` at the start of every session — both
+tiers are no longer write-only. See §8 for how `patient_context.allergies` also
+feeds a deterministic safety check in `validator_node`.
 
 **Pre-seeded fallback data** (dev/test without Supabase):
 - Two sample local memories (Penicillin allergy, Asthma exacerbation)
 - Two global patterns (PE vs Asthma differential cues, Beta-blocker in asthma safety anomaly)
 
-**`_compute_keyword_score(text, query)`:** Word overlap ratio for relevance ranking when vector search is unavailable.
+**`_compute_keyword_score(text, query)`:** Word overlap ratio for relevance ranking — the
+default, and automatic fallback, whenever semantic vector search isn't available.
+
+**Semantic retrieval (optional, `src/medgraph/embeddings.py`):** `get_embeddings()`
+returns a real embeddings client (Ollama's configured embedding model, or OpenAI's
+`text-embedding-3-small`) when one is configured, else `None`. When available,
+`store_local_memory`/`store_global_memory` compute and persist the vector (the
+`embedding VECTOR(1536)` column already existed in the schema but was previously
+always `NULL`), and `query_local_memory`/`query_global_memory` retrieve via the
+`match_local_memory`/`match_global_memory` pgvector cosine-similarity Postgres
+functions (`supabase/schema.sql`) called through a PostgREST RPC. Any failure — no
+provider configured, the RPC not migrated into Supabase yet, Supabase itself not
+configured — falls straight back to keyword scoring, so this requires no
+configuration change to keep working exactly as before.
 
 ---
 
@@ -1017,6 +1068,8 @@ All configuration uses `pydantic-settings` (`BaseSettings`). Reads from `.env` f
 | `OPENAI_API_KEY` | *(empty)* | OpenAI API key (fallback) |
 | `OPENAI_FALLBACK_MODEL` | `gpt-4o-mini` | OpenAI fallback model |
 | `LLM_PROVIDER` | `auto` | `auto` / `ollama` / `openai` |
+| `EMBEDDING_PROVIDER` | `auto` | `auto` / `ollama` / `openai` / `none` — optional, for semantic memory retrieval |
+| `EMBEDDING_MODEL` | `nomic-embed-text` | Ollama embedding model name (used when the Ollama path is active) |
 | `API_HOST` | `0.0.0.0` | Server bind address |
 | `API_PORT` | `8000` | Server port |
 | `API_RELOAD` | `False` | Hot reload (dev only) |
@@ -1301,7 +1354,7 @@ Calculated dynamically from the current phase:
 
 1. **No real drug interaction API**: The `drug_checker.py` tool uses a hardcoded 10-entry lookup. Production deployments should integrate OpenFDA, DrugBank, or RxNorm.
 
-2. **No vector embeddings in dev mode**: `DualTierMemoryManager` fallback uses keyword overlap scoring instead of semantic vector similarity. Real embedding models (e.g., `text-embedding-3-small`) should be used with Supabase pgvector.
+2. **Vector embeddings are optional, not automatic**: `DualTierMemoryManager` now supports real semantic retrieval via `src/medgraph/embeddings.py` (Ollama's embedding model, or OpenAI's `text-embedding-3-small`) against the existing Supabase pgvector columns, but falls back to keyword overlap scoring whenever no embedding provider is configured — which is the default out of the box. Configure `EMBEDDING_PROVIDER`/`EMBEDDING_MODEL` and re-run `supabase/schema.sql` (for the `match_local_memory`/`match_global_memory` functions) to enable it.
 
 3. **MemorySaver is ephemeral**: In-memory checkpointer loses all sessions on server restart. Enable `CHECKPOINT_DB_PATH` for persistence.
 

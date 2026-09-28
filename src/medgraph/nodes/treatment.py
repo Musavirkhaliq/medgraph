@@ -107,21 +107,21 @@ def treatment_node(state: MedicalState) -> dict:
         if not meds:
             if "asthma" in dx:
                 meds = [
-                    {"name": "Albuterol HFA", "dosage": "90 mcg/actuation", "route": "Inhalation", "frequency": "1-2 puffs q4-6h PRN", "indication": "Bronchospasm relief"},
-                    {"name": "Fluticasone propionate", "dosage": "110 mcg", "route": "Inhalation", "frequency": "2 puffs twice daily", "indication": "Maintenance anti-inflammatory control"}
+                    {"name": "Albuterol HFA", "dose": "90 mcg/actuation", "route": "Inhalation", "frequency": "1-2 puffs q4-6h PRN", "indication": "Bronchospasm relief"},
+                    {"name": "Fluticasone propionate", "dose": "110 mcg", "route": "Inhalation", "frequency": "2 puffs twice daily", "indication": "Maintenance anti-inflammatory control"}
                 ]
             elif "copd" in dx:
                 meds = [
-                    {"name": "Tiotropium bromide", "dosage": "18 mcg", "route": "Inhalation", "frequency": "Once daily", "indication": "Long-acting bronchodilation"},
-                    {"name": "Albuterol HFA", "dosage": "90 mcg", "route": "Inhalation", "frequency": "PRN shortness of breath", "indication": "Rescue relief"}
+                    {"name": "Tiotropium bromide", "dose": "18 mcg", "route": "Inhalation", "frequency": "Once daily", "indication": "Long-acting bronchodilation"},
+                    {"name": "Albuterol HFA", "dose": "90 mcg", "route": "Inhalation", "frequency": "PRN shortness of breath", "indication": "Rescue relief"}
                 ]
             elif "pneumonia" in dx:
                 meds = [
-                    {"name": "Amoxicillin", "dosage": "500 mg", "route": "Oral", "frequency": "TID for 7 days", "indication": "Community-acquired pneumonia empiric therapy"}
+                    {"name": "Amoxicillin", "dose": "500 mg", "route": "Oral", "frequency": "TID for 7 days", "indication": "Community-acquired pneumonia empiric therapy"}
                 ]
             else:
                 meds = [
-                    {"name": "Symptomatic supportive therapy", "dosage": "As directed", "route": "Oral", "frequency": "PRN", "indication": "Symptom management"}
+                    {"name": "Symptomatic supportive therapy", "dose": "As directed", "route": "Oral", "frequency": "PRN", "indication": "Symptom management"}
                 ]
 
         if not lifestyles:
@@ -146,7 +146,7 @@ def treatment_node(state: MedicalState) -> dict:
         logger.error("[treatment] Node failed: %s", exc, exc_info=True)
         return {
             "medications": [
-                {"name": "Symptomatic supportive care", "dosage": "Standard dose", "route": "Oral", "frequency": "PRN", "indication": "Symptom management"}
+                {"name": "Symptomatic supportive care", "dose": "Standard dose", "route": "Oral", "frequency": "PRN", "indication": "Symptom management"}
             ],
             "procedures": [],
             "lifestyle_modifications": ["Rest and fluids", "Seek medical evaluation if symptoms worsen"],
