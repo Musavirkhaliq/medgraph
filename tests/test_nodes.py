@@ -75,6 +75,30 @@ class TestParseJson:
         assert isinstance(result, QuestionResult)
         assert result.questions_to_ask == []
 
+    def test_triage_list_unwrapping(self):
+        from medgraph.nodes.triage import TriageResult
+        # Model returns list of domains
+        raw = '["cardiology", "pulmonology"]'
+        result = parse_llm_json(raw, TriageResult, "triage")
+        assert result.suspected_domains == ["cardiology", "pulmonology"]
+
+        # Model returns list containing object
+        raw_obj = '[{"triage_level": "urgent", "suspected_domains": ["neurology"]}]'
+        result_obj = parse_llm_json(raw_obj, TriageResult, "triage")
+        assert result_obj.triage_level == "urgent"
+        assert result_obj.suspected_domains == ["neurology"]
+
+    def test_questioner_list_unwrapping(self):
+        # Model returns list of question strings directly
+        raw = '["When did the symptoms begin?", "Do you have any fever?"]'
+        result = parse_llm_json(raw, QuestionResult, "questioner")
+        assert result.questions_to_ask == ["When did the symptoms begin?", "Do you have any fever?"]
+
+        # Model returns dict with 'questions' instead of 'questions_to_ask'
+        raw_alt = '{"questions": ["Where is the pain?"]}'
+        result_alt = parse_llm_json(raw_alt, QuestionResult, "questioner")
+        assert result_alt.questions_to_ask == ["Where is the pain?"]
+
 
 class TestBuildContext:
     def test_empty_state(self):
