@@ -1,25 +1,34 @@
 import React, { useState } from 'react';
-import { 
-  FileEdit, 
-  Copy, 
-  Check, 
-  Pill, 
-  Download, 
-  Sparkles, 
-  ShieldCheck, 
+import {
+  FileEdit,
+  Copy,
+  Check,
+  Pill,
+  Download,
+  Sparkles,
+  ShieldCheck,
   AlertTriangle,
   Send
 } from 'lucide-react';
+import { normalizeMedications, normalizeDifferential, percent } from '../../utils/clinical';
 
-export default function SoapNotesStudio({ 
-  patient, 
-  primaryDiagnosis = "Acute Asthma Exacerbation (J45.909)", 
-  medications = [], 
-  caseSummary = "" 
+export default function SoapNotesStudio({
+  patient,
+  primaryDiagnosis,
+  diagnosisConfidence = 0,
+  differential = [],
+  medications = [],
+  caseSummary = "",
+  followUp = "",
+  monitoring = [],
+  lifestyleModifications = [],
 }) {
   const [copied, setCopied] = useState(false);
 
-  const defaultMeds = medications.length > 0 ? medications : [
+  const hasRealData = Boolean(caseSummary || primaryDiagnosis || medications.length > 0);
+  const normalizedDiffs = normalizeDifferential(differential);
+
+  const defaultMeds = medications.length > 0 ? normalizeMedications(medications) : [
     {
       name: "Albuterol Sulfate Inhalation Aerosol",
       dosage: "90 mcg/actuation",
@@ -46,33 +55,32 @@ export default function SoapNotesStudio({
     }
   ];
 
-  const soapContent = `PATIENT CLINICAL SOAP NOTE & SUMMARY
-Patient: ${patient?.name || "John Doe"} | MRN: ${patient?.mrn || "MRN-2026-0891"} | Date: ${new Date().toLocaleDateString()}
-Attending Physician: Dr. Sarah Jenkins, MD (MD-98210-NY)
+  const soapContent = hasRealData ? `PATIENT CLINICAL SOAP NOTE & SUMMARY
+Patient: ${patient?.name || "Unnamed patient"} | MRN: ${patient?.mrn || "N/A"} | Date: ${new Date().toLocaleDateString()}
 
 =======================================================
 [S] SUBJECTIVE:
-Patient is a 50-year-old male presenting with intermittent shortness of breath (dyspnea) and dry cough over the past 3 days, noticeably worsened by strenuous physical exertion and dust exposure. Denies retrosternal chest pain, orthopnea, fever, chills, or night sweats. Reports using as-needed rescue inhaler with partial temporary relief. Known history of mild persistent asthma and documented severe penicillin anaphylaxis.
+${caseSummary || patient?.initialStory || "Clinical narrative pending case synthesis."}
 
 [O] OBJECTIVE:
-- Vital Signs: BP 138/85 mmHg, HR 92 bpm regular, RR 22/min, Temp 36.8°C, SpO2 94% on room air.
-- General: Alert, oriented x4, mild respiratory distress upon speaking in full sentences.
-- Respiratory: Bilateral expiratory wheezing diffusely auscultated. No crackles or pleural friction rubs. Symmetrical chest expansion.
-- Cardiovascular: S1/S2 present, no murmurs, gallops, or peripheral edema.
-- Spirometry: FEV1 64% predicted; post-bronchodilator increase +16% (260 mL), consistent with reversible airflow obstruction.
-- Chest X-ray: Hyperinflation of bilateral lung fields without focal consolidation or pneumothorax.
+${normalizedDiffs.length > 0 ? `Diagnostic workup and clinical correlation support the assessment below.` : "Awaiting diagnostic workup results."}
 
 [A] ASSESSMENT:
-1. Primary Diagnosis: Acute Moderate Asthma Exacerbation (ICD-10 J45.909) - High confidence (92%).
-2. Essential Hypertension (ICD-10 I10) - Stage 1, stable on current regimen.
-3. Allergy: Penicillin - Severe anaphylactic reaction noted. Beta-lactams contraindicated.
+${primaryDiagnosis ? `1. Primary Diagnosis: ${primaryDiagnosis}${diagnosisConfidence ? ` - Confidence ${percent(diagnosisConfidence)}%` : ''}.` : "Assessment pending."}
+${normalizedDiffs.slice(1).map((d, i) => `${i + 2}. ${d.condition} (${d.status}) - ${d.confidence}% likelihood.`).join('\n')}
+${patient?.allergies?.length ? `\nAllergy: ${patient.allergies.join(', ')} - contraindicated agents avoided.` : ''}
 
 [P] PLAN & E-PRESCRIPTIONS:
-1. Albuterol HFA 90 mcg: 2 puffs Q4-6H PRN for acute shortness of breath.
-2. Prednisone 40 mg PO daily for 5 days.
-3. Fluticasone/Salmeterol 250/50 mcg: 1 puff BID for controller therapy.
-4. Patient Education: Proper MDI technique with valved holding chamber. Peak flow self-monitoring.
-5. Follow-up: Clinic visit in 7 to 10 days, or seek urgent emergency care if peak flow drops < 50% or severe distress develops.
+${defaultMeds.map((m, i) => `${i + 1}. ${m.name}${m.dosage ? ` ${m.dosage}` : ''}: ${m.frequency || 'As directed'}.`).join('\n') || "No medications prescribed yet."}
+${lifestyleModifications.length > 0 ? `\nLifestyle & Non-Pharmacological: ${lifestyleModifications.join('; ')}.` : ''}
+${monitoring.length > 0 ? `\nMonitoring: ${monitoring.join('; ')}.` : ''}
+${followUp ? `\nFollow-up: ${followUp}` : '\nFollow-up: To be determined upon completion of assessment.'}
+=======================================================` : `PATIENT CLINICAL SOAP NOTE & SUMMARY
+Patient: ${patient?.name || "Unnamed patient"} | MRN: ${patient?.mrn || "N/A"} | Date: ${new Date().toLocaleDateString()}
+
+=======================================================
+This SOAP note will populate automatically as the clinical pipeline progresses
+through case synthesis, diagnosis, and treatment planning for this consultation.
 =======================================================`;
 
   const handleCopy = () => {

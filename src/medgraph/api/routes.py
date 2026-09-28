@@ -838,13 +838,31 @@ async def api_signup(payload: dict[str, Any]):
 # ADMIN MANAGEMENT & USER REGISTRATION ENDPOINTS
 # ════════════════════════════════════════════════════════════════════════════
 
+@router.get("/admin/doctors", tags=["Admin"])
+async def api_list_doctors():
+    """Admin endpoint: List all registered Doctor accounts."""
+    from medgraph.db.auth import list_users
+
+    doctors = await list_users(role="doctor")
+    return {"doctors": [d.model_dump() for d in doctors]}
+
+
+@router.get("/admin/patients", tags=["Admin"])
+async def api_list_admin_patients():
+    """Admin endpoint: List all registered Patient clinical records."""
+    from medgraph.db.repository import search_patients
+
+    patients = await search_patients("")
+    return {"patients": [p.model_dump() for p in patients]}
+
+
 @router.post("/admin/register-doctor", tags=["Admin"])
 async def api_register_doctor(payload: dict[str, Any]):
     """Admin endpoint: Register a new consulting Doctor account (Admin RBAC restricted)."""
     from medgraph.db.auth import signup_user
     from medgraph.db.client import get_db_client
 
-    requester_role = payload.get("requester_role", "admin")
+    requester_role = payload.get("requester_role", "")
     if requester_role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden: Executive Admin privileges required to register Doctor accounts.")
 
@@ -895,7 +913,7 @@ async def api_register_patient(payload: dict[str, Any]):
     from medgraph.db.auth import signup_user
     from medgraph.db.repository import create_patient_profile
 
-    requester_role = payload.get("requester_role", "admin")
+    requester_role = payload.get("requester_role", "")
     if requester_role != "admin":
         raise HTTPException(status_code=403, detail="Forbidden: Executive Admin privileges required to register Patient profiles.")
 

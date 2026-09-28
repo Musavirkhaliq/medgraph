@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
-import { 
-  Search, 
-  UserPlus, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  ArrowRight, 
-  ChevronRight, 
-  ShieldAlert, 
-  User, 
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  Search,
+  UserPlus,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  ArrowRight,
+  ChevronRight,
+  ShieldAlert,
+  User,
   Stethoscope,
-  HeartPulse
+  HeartPulse,
+  RefreshCw
 } from 'lucide-react';
+import { searchPatients } from '../../services/api';
 
 export const DEFAULT_PATIENTS = [
   {
@@ -58,11 +60,63 @@ export const DEFAULT_PATIENTS = [
   }
 ];
 
+function computeAge(dob) {
+  if (!dob) return null;
+  const birth = new Date(dob);
+  if (Number.isNaN(birth.getTime())) return null;
+  const diff = Date.now() - birth.getTime();
+  return Math.max(0, Math.floor(diff / (365.25 * 24 * 3600 * 1000)));
+}
+
+function mapPatientProfile(p) {
+  const allergyNames = (p.allergies || []).map(a => (typeof a === 'string' ? a : a.allergen)).filter(Boolean);
+  const hasSevere = (p.allergies || []).some(a => typeof a === 'object' && /sever|anaphyla/i.test(a.severity || ''));
+  const allergyLevel = allergyNames.length === 0 ? 'safe' : (hasSevere ? 'critical' : 'warning');
+  const activeDx = (p.chronic_conditions || []).map(c => (typeof c === 'string' ? c : c.condition)).filter(Boolean);
+
+  return {
+    id: p.id,
+    name: p.full_name,
+    mrn: p.mrn,
+    gender: (p.gender || '').charAt(0).toUpperCase() + (p.gender || '').slice(1),
+    age: computeAge(p.date_of_birth),
+    activeDx: activeDx.length > 0 ? activeDx : ["No active diagnoses on file"],
+    allergies: allergyNames.length > 0 ? allergyNames : ["No Known Drug Allergies (NKDA)"],
+    allergyLevel,
+    lastVisit: "See longitudinal timeline",
+    status: "Active Record",
+    vitals: { bp: "Not recorded", hr: "Not recorded", spo2: "Not recorded" },
+    initialStory: `${computeAge(p.date_of_birth) || 'Unknown age'}-year-old ${p.gender || 'patient'} (MRN ${p.mrn}) presenting for clinical assessment.${activeDx.length ? ` Known history: ${activeDx.join(', ')}.` : ''}${allergyNames.length ? ` Documented allergies: ${allergyNames.join(', ')}.` : ' No known drug allergies.'}`,
+  };
+}
+
 export default function PatientDirectory({ onSelectPatient, onRegisterNewClick }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  const [patients, setPatients] = useState(DEFAULT_PATIENTS);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLive, setIsLive] = useState(false);
 
-  const filteredPatients = DEFAULT_PATIENTS.filter(pat => {
+  const loadPatients = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await searchPatients('');
+      if (res && Array.isArray(res.patients) && res.patients.length > 0) {
+        setPatients(res.patients.map(mapPatientProfile));
+        setIsLive(true);
+      }
+    } catch (err) {
+      console.warn("Could not load live patient directory, using demo records:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadPatients();
+  }, [loadPatients]);
+
+  const filteredPatients = patients.filter(pat => {
     const q = searchTerm.toLowerCase();
     const matchesQuery = 
       pat.name.toLowerCase().includes(q) ||
@@ -91,14 +145,29 @@ export default function PatientDirectory({ onSelectPatient, onRegisterNewClick }
           </p>
         </div>
 
-        <button
-          onClick={onRegisterNewClick}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs sm:text-sm transition-all shadow-glow-cyan"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Register New Patient</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={loadPatients}
+            title="Refresh patient directory"
+            className="p-2.5 rounded-xl bg-slate-900 border border-white/10 text-slate-300 hover:text-white hover:border-white/20 transition-all"
+          >
+            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+          </button>
+          <button
+            onClick={onRegisterNewClick}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold text-xs sm:text-sm transition-all shadow-glow-cyan"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Register New Patient</span>
+          </button>
+        </div>
       </div>
+
+      {!isLive && (
+        <div className="mb-4 px-3 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300">
+          Showing demo records &mdash; live backend directory unavailable or empty.
+        </div>
+      )}
 
       {/* Search & Filter Bar */}
       <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -149,7 +218,7 @@ export default function PatientDirectory({ onSelectPatient, onRegisterNewClick }
                       {patient.name}
                     </h3>
                     <div className="text-xs text-slate-400 font-mono">
-                      {patient.mrn} &bull; {patient.gender}, {patient.age}y
+                      {patient.mrn} &bull; {patient.gender}, {patient.age != null ? `${patient.age}y` : 'Age unknown'}
                     </div>
                   </div>
                 </div>

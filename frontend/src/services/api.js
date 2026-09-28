@@ -204,11 +204,11 @@ export async function getSessionSummary(sessionId) {
 }
 
 
-export async function registerDoctor(data) {
+export async function registerDoctor(data, requesterRole = "admin") {
   const res = await fetch(`${API_BASE}/admin/register-doctor`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, requester_role: requesterRole }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Registration failed" }));
@@ -217,15 +217,45 @@ export async function registerDoctor(data) {
   return await res.json();
 }
 
-export async function registerPatient(data) {
+export async function registerPatient(data, requesterRole = "admin") {
   const res = await fetch(`${API_BASE}/admin/register-patient`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify({ ...data, requester_role: requesterRole }),
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: "Registration failed" }));
     throw new Error(err.detail || "Patient registration failed");
   }
   return await res.json();
+}
+
+export async function listDoctors() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/doctors`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("List doctors API unavailable:", e);
+  }
+  return null;
+}
+
+export async function listAdminPatients() {
+  try {
+    const res = await fetch(`${API_BASE}/admin/patients`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("List patients API unavailable:", e);
+  }
+  return null;
+}
+
+export async function getPatientFollowups(patientId) {
+  try {
+    const res = await fetch(`${API_BASE}/patients/${patientId}/followups`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Patient followups API fallback:", e);
+  }
+  return null;
 }

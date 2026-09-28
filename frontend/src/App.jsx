@@ -43,9 +43,23 @@ export default function App() {
       window.location.hash = currentView;
     }
   }, [currentView]);
-  
+
   // Active User session (initially null - requires authentication)
   const [user, setUser] = useState(null);
+
+  // Role-gate protected views: a role-mismatched or unauthenticated user
+  // navigating (e.g. via hash) into a portal view is bounced back to the hub.
+  const VIEW_ROLE = {
+    'doctor-directory': 'doctor', 'doctor-language': 'doctor', 'doctor-active': 'doctor', 'doctor-report': 'doctor',
+    'patient-portal': 'patient',
+    'admin-dashboard': 'admin',
+  };
+  useEffect(() => {
+    const requiredRole = VIEW_ROLE[currentView];
+    if (requiredRole && (!user || user.role !== requiredRole)) {
+      setCurrentView('hub');
+    }
+  }, [currentView, user]);
 
 
   // Selected Patient & Parameters
@@ -69,6 +83,16 @@ export default function App() {
   const [emergencyInfo, setEmergencyInfo] = useState(null);
   const [reportData, setReportData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [symptoms, setSymptoms] = useState([]);
+  const [caseSummary, setCaseSummary] = useState("");
+  const [completionPercentage, setCompletionPercentage] = useState(10);
+  const [agentTelemetry, setAgentTelemetry] = useState(null);
+  const [followUp, setFollowUp] = useState("");
+  const [monitoring, setMonitoring] = useState([]);
+  const [lifestyleModifications, setLifestyleModifications] = useState([]);
+  const [diagnosisConfidence, setDiagnosisConfidence] = useState(0);
+  const [validationWarnings, setValidationWarnings] = useState([]);
+  const [isSafe, setIsSafe] = useState(null);
 
   // Modals & Audio
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -195,6 +219,12 @@ export default function App() {
         if (state.differential_diagnosis) setDifferential(state.differential_diagnosis);
         if (state.medications) setMedications(state.medications);
         if (state.investigations) setInvestigations(state.investigations);
+        if (state.symptoms) setSymptoms(state.symptoms);
+        if (state.case_summary) setCaseSummary(state.case_summary);
+        if (typeof state.completion_percentage === 'number') setCompletionPercentage(state.completion_percentage);
+        if (state.agent_telemetry) setAgentTelemetry(state.agent_telemetry);
+        if (state.validation_warnings) setValidationWarnings(state.validation_warnings);
+        if (typeof state.is_safe === 'boolean') setIsSafe(state.is_safe);
 
         if (state.is_emergency) {
           setIsEmergency(true);
@@ -266,7 +296,14 @@ export default function App() {
           clearInterval(pollIntervalRef.current);
           setCurrentPhase("complete");
           const rep = await getFinalReport(sid).catch(() => null);
-          if (rep) setReportData(rep);
+          if (rep) {
+            setReportData(rep);
+            if (rep.follow_up) setFollowUp(rep.follow_up);
+            if (rep.monitoring) setMonitoring(rep.monitoring);
+            if (rep.lifestyle_modifications) setLifestyleModifications(rep.lifestyle_modifications);
+            if (typeof rep.diagnosis_confidence === 'number') setDiagnosisConfidence(rep.diagnosis_confidence);
+            if (rep.agent_telemetry) setAgentTelemetry(rep.agent_telemetry);
+          }
         }
       } catch (e) {
         // Continue polling
@@ -461,6 +498,22 @@ export default function App() {
     setIsWaitingAnswer(false);
     setCurrentQuestion("");
     setIsWaitingTests(false);
+    setSymptoms([]);
+    setCaseSummary("");
+    setCompletionPercentage(10);
+    setAgentTelemetry(null);
+    setFollowUp("");
+    setMonitoring([]);
+    setLifestyleModifications([]);
+    setDiagnosisConfidence(0);
+    setValidationWarnings([]);
+    setIsSafe(null);
+    setDifferential([]);
+    setMedications([]);
+    setInvestigations([]);
+    setReportData(null);
+    setIsEmergency(false);
+    setEmergencyInfo(null);
     setCurrentView('doctor-directory');
   };
 
@@ -534,6 +587,7 @@ export default function App() {
             patient={selectedPatient}
             sessionId={sessionId}
             currentPhase={currentPhase}
+            completionPercentage={completionPercentage}
             messages={messages}
             onSendMessage={handleSendMessage}
             isWaitingAnswer={isWaitingAnswer}
@@ -548,9 +602,16 @@ export default function App() {
             emergencyInfo={emergencyInfo}
             triageLevel={triageLevel}
             triageConfidence={triageConfidence}
+            symptoms={symptoms}
             differential={differential}
             primaryDiagnosis={primaryDiagnosis}
+            diagnosisConfidence={diagnosisConfidence}
             medications={medications}
+            caseSummary={caseSummary}
+            followUp={followUp}
+            monitoring={monitoring}
+            lifestyleModifications={lifestyleModifications}
+            agentTelemetry={agentTelemetry}
             onOpenAgentTelemetry={(key = 'intake_agent') => {
               setSelectedTelemetryKey(key);
               setIsTelemetryOpen(true);
@@ -565,18 +626,21 @@ export default function App() {
           <FinalClinicalReport
             patient={selectedPatient}
             reportData={reportData}
+            doctor={user}
             onNewConsultation={handleResetSession}
           />
         )}
 
         {currentView === 'patient-portal' && (
           <PatientDashboard
+            user={user}
             onBackToHub={() => setCurrentView('hub')}
           />
         )}
 
         {currentView === 'admin-dashboard' && (
           <AdminDashboard
+            user={user}
             onBackToHub={() => setCurrentView('hub')}
           />
         )}
@@ -595,6 +659,7 @@ export default function App() {
         isOpen={isTelemetryOpen}
         onClose={() => setIsTelemetryOpen(false)}
         selectedAgentKey={selectedTelemetryKey}
+        agentTelemetry={agentTelemetry}
       />
 
       <ClinicalMemoryModal

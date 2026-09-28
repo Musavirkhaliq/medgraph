@@ -12,7 +12,7 @@ const AGENTS = [
   { key: 'validator_agent', name: 'Validator Agent', role: 'Drug Interactions & Allergy Rules' }
 ];
 
-export default function TelemetryModal({ isOpen, onClose, selectedAgentKey = 'intake_agent' }) {
+export default function TelemetryModal({ isOpen, onClose, selectedAgentKey = 'intake_agent', agentTelemetry = null }) {
   const [activeKey, setActiveKey] = useState(selectedAgentKey);
   const [copied, setCopied] = useState(false);
 
@@ -23,6 +23,15 @@ export default function TelemetryModal({ isOpen, onClose, selectedAgentKey = 'in
   if (!isOpen) return null;
 
   const getAgentPayload = (key) => {
+    // Prefer live telemetry captured from the running session (see
+    // `_build_agent_telemetry` in src/medgraph/api/routes.py) over demo data.
+    if (agentTelemetry && agentTelemetry[key]) {
+      return agentTelemetry[key];
+    }
+    return getDemoAgentPayload(key);
+  };
+
+  const getDemoAgentPayload = (key) => {
     switch (key) {
       case 'intake_agent':
         return {
@@ -165,8 +174,13 @@ export default function TelemetryModal({ isOpen, onClose, selectedAgentKey = 'in
           {/* Right JSON View */}
           <div className="flex-1 flex flex-col rounded-xl bg-slate-950 border border-white/5 p-4 min-h-0 overflow-hidden space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-mono text-cyan-400 font-semibold uppercase">
+              <span className="text-xs font-mono text-cyan-400 font-semibold uppercase flex items-center gap-2">
                 {activeKey} Output Payload
+                {agentTelemetry && agentTelemetry[activeKey] ? (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-teal-500/20 text-teal-300 border border-teal-500/30">LIVE SESSION</span>
+                ) : (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-500 border border-white/5">DEMO</span>
+                )}
               </span>
               <button
                 onClick={handleCopy}

@@ -16,11 +16,13 @@ import DicomLabsViewer from './DicomLabsViewer';
 import SoapNotesStudio from './SoapNotesStudio';
 import PatientTimeline from './PatientTimeline';
 import RightIntelligenceHud from './RightIntelligenceHud';
+import { percent, phaseLabel } from '../../utils/clinical';
 
 export default function ConsultationWorkspace({
   patient,
   sessionId,
   currentPhase,
+  completionPercentage = 10,
   messages,
   onSendMessage,
   isWaitingAnswer,
@@ -38,7 +40,13 @@ export default function ConsultationWorkspace({
   symptoms,
   differential,
   primaryDiagnosis,
+  diagnosisConfidence,
   medications,
+  caseSummary,
+  followUp,
+  monitoring,
+  lifestyleModifications,
+  agentTelemetry,
   onOpenAgentTelemetry,
   onOpenFinalReport,
   onToggleManualTests,
@@ -148,6 +156,8 @@ export default function ConsultationWorkspace({
               isEmergency={isEmergency}
               emergencyInfo={emergencyInfo}
               currentPhase={currentPhase}
+              phaseProgress={percent(completionPercentage)}
+              phaseText={phaseLabel(currentPhase)}
               onToggleManualTests={onToggleManualTests}
               language={language}
             />
@@ -156,6 +166,7 @@ export default function ConsultationWorkspace({
           {activeTab === 'diff' && (
             <DifferentialMatrix
               primaryDiagnosis={primaryDiagnosis}
+              confidence={percent(diagnosisConfidence)}
               differential={differential}
             />
           )}
@@ -172,7 +183,13 @@ export default function ConsultationWorkspace({
             <SoapNotesStudio
               patient={patient}
               primaryDiagnosis={primaryDiagnosis}
+              diagnosisConfidence={diagnosisConfidence}
+              differential={differential}
               medications={medications}
+              caseSummary={caseSummary}
+              followUp={followUp}
+              monitoring={monitoring}
+              lifestyleModifications={lifestyleModifications}
             />
           )}
 
