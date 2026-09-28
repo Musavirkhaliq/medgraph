@@ -1,0 +1,1241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Doctor Consultation Workstation — MedAI by LTM Research</title>
+    <meta name="description" content="Multi-agent clinical reasoning and decision support workstation for physicians and healthcare specialists.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=30">
+</head>
+<body>
+
+    <!-- Particle canvas -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Scanline overlay -->
+    <div class="scanline-overlay"></div>
+
+    <!-- ══ Screen 1: Patient Directory & Search Selection Screen ═══════════════════════ -->
+    <div id="screen-patient-search" class="screen active">
+        <!-- Persistent Authenticated User Header Bar -->
+        <div class="patient-profile-pill" style="margin:16px auto;max-width:1240px;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:rgba(2,12,24,0.85);border:1px solid rgba(0,229,255,0.3);border-radius:var(--radius);backdrop-filter:var(--blur);">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <span style="padding:4px 10px;border-radius:6px;background:var(--cyan);color:#020610;font-family:'Orbitron',sans-serif;font-weight:700;font-size:0.75rem;">👨‍⚕️ PHYSICIAN WORKSTATION</span>
+                <div style="display:flex;flex-direction:column;">
+                    <span style="font-weight:700;color:var(--text-primary);font-size:1.02rem;">Dr. Sarah Jenkins, MD</span>
+                    <span style="font-size:0.78rem;color:var(--text-secondary);">Pulmonology &amp; Internal Medicine &bull; License: MD-98210-NY</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;">
+                <button type="button" class="btn btn-outline-sm" onclick="openDualMemoryModal()">🧠 Clinical Memory Hub</button>
+                <button type="button" class="btn btn-outline-sm" onclick="window.location.href='index.html'">← Home Portals</button>
+            </div>
+        </div>
+
+        <div style="max-width:1240px;margin:20px auto;padding:0 15px;">
+            <div class="intake-form-card" style="margin-bottom:24px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
+                    <div>
+                        <span class="form-step-badge">// STEP 1 OF 3: PATIENT SELECTION</span>
+                        <h2 style="font-size:1.6rem;margin-top:4px;">Patient Directory &amp; Clinical Records</h2>
+                        <p style="color:var(--text-secondary);font-size:0.9rem;">Search existing patient medical records or register a new patient account.</p>
+                    </div>
+                    <button type="button" class="btn btn-primary" onclick="openAdminPortalModal()" style="font-size:0.9rem;padding:8px 16px;">
+                        + Register New Patient
+                    </button>
+                </div>
+
+                <!-- Search Input Bar -->
+                <div style="position:relative;margin-bottom:20px;">
+                    <input type="text" id="patient-search-input" onkeyup="filterPatientCards(this.value)" placeholder="🔍 Search patient by Name, MRN, Condition (e.g. John, Asthma, HTN, 2026)..." style="width:100%;padding:14px 18px;padding-left:44px;font-size:1rem;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.25);border-radius:var(--radius-sm);color:var(--text-primary);outline:none;">
+                    <span style="position:absolute;left:16px;top:50%;transform:translateY(-50%);font-size:1.1rem;opacity:0.6;">🔍</span>
+                </div>
+
+                <!-- Patient Cards Grid -->
+                <div id="patient-cards-grid" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(360px, 1fr));gap:16px;">
+                    
+                    <!-- Patient 1: John Doe -->
+                    <div class="patient-card" data-search="john doe mrn-2026-0891 male 50 asthma penicillin" onclick="selectPatientForConsultation('pat-001')" style="cursor:pointer;padding:18px;background:rgba(4,20,38,0.7);border:1px solid rgba(0,229,255,0.25);border-radius:var(--radius-sm);transition:all 0.2s ease;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                            <div>
+                                <h3 style="font-size:1.15rem;color:var(--cyan);margin:0;">John Doe</h3>
+                                <span style="font-size:0.78rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;">MRN-2026-0891 &bull; Male, 50y</span>
+                            </div>
+                            <span style="padding:3px 8px;border-radius:12px;background:rgba(0,229,255,0.1);color:var(--cyan);font-size:0.75rem;font-weight:600;">ACTIVE RECORD</span>
+                        </div>
+                        <div style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.4;">
+                            <div><strong>Active Dx:</strong> Asthma (J45.909), HTN</div>
+                            <div><strong>Allergies:</strong> <span style="color:var(--red-alert);font-weight:700;">Penicillin (Anaphylaxis)</span></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid rgba(0,229,255,0.1);">
+                            <span style="font-size:0.75rem;color:var(--text-muted);">Last Visit: 3 days ago</span>
+                            <button type="button" class="btn btn-outline-sm" style="border-color:var(--cyan);color:var(--cyan);">Select Patient →</button>
+                        </div>
+                    </div>
+
+                    <!-- Patient 2: Jane Miller -->
+                    <div class="patient-card" data-search="jane miller mrn-2026-1042 female 41 htn diabetes" onclick="selectPatientForConsultation('pat-002')" style="cursor:pointer;padding:18px;background:rgba(4,20,38,0.7);border:1px solid rgba(0,229,255,0.25);border-radius:var(--radius-sm);transition:all 0.2s ease;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                            <div>
+                                <h3 style="font-size:1.15rem;color:var(--cyan);margin:0;">Jane Miller</h3>
+                                <span style="font-size:0.78rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;">MRN-2026-1042 &bull; Female, 41y</span>
+                            </div>
+                            <span style="padding:3px 8px;border-radius:12px;background:rgba(0,229,255,0.1);color:var(--cyan);font-size:0.75rem;font-weight:600;">ACTIVE RECORD</span>
+                        </div>
+                        <div style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.4;">
+                            <div><strong>Active Dx:</strong> Essential HTN, Type 2 DM</div>
+                            <div><strong>Allergies:</strong> None Known</div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid rgba(0,229,255,0.1);">
+                            <span style="font-size:0.75rem;color:var(--text-muted);">Last Visit: 1 week ago</span>
+                            <button type="button" class="btn btn-outline-sm" style="border-color:var(--cyan);color:var(--cyan);">Select Patient →</button>
+                        </div>
+                    </div>
+
+                    <!-- Patient 3: Robert Chen -->
+                    <div class="patient-card" data-search="robert chen mrn-2026-0419 male 68 copd sulfa" onclick="selectPatientForConsultation('pat-003')" style="cursor:pointer;padding:18px;background:rgba(4,20,38,0.7);border:1px solid rgba(0,229,255,0.25);border-radius:var(--radius-sm);transition:all 0.2s ease;">
+                        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+                            <div>
+                                <h3 style="font-size:1.15rem;color:var(--cyan);margin:0;">Robert Chen</h3>
+                                <span style="font-size:0.78rem;color:var(--text-secondary);font-family:'JetBrains Mono',monospace;">MRN-2026-0419 &bull; Male, 68y</span>
+                            </div>
+                            <span style="padding:3px 8px;border-radius:12px;background:rgba(0,229,255,0.1);color:var(--cyan);font-size:0.75rem;font-weight:600;">ACTIVE RECORD</span>
+                        </div>
+                        <div style="font-size:0.84rem;color:var(--text-secondary);margin-bottom:12px;line-height:1.4;">
+                            <div><strong>Active Dx:</strong> Severe COPD, Hyperlipidemia</div>
+                            <div><strong>Allergies:</strong> <span style="color:var(--amber);font-weight:700;">Sulfa Drugs (Rash)</span></div>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;padding-top:10px;border-top:1px solid rgba(0,229,255,0.1);">
+                            <span style="font-size:0.75rem;color:var(--text-muted);">Last Visit: 2 weeks ago</span>
+                            <button type="button" class="btn btn-outline-sm" style="border-color:var(--cyan);color:var(--cyan);">Select Patient →</button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ Screen 2: Language & Consultation Setup Screen ═════════════════════════ -->
+    <div id="screen-language-select" class="screen hidden">
+        <div style="max-width:960px;margin:30px auto;padding:0 15px;">
+            <div class="intake-form-card">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                    <div>
+                        <span class="form-step-badge">// STEP 2 OF 3: CONVERSATION SETUP</span>
+                        <h2 style="font-size:1.6rem;margin-top:4px;">Language &amp; Consultation Mode</h2>
+                        <p style="color:var(--text-secondary);font-size:0.9rem;">Select the patient's preferred conversation language and interaction mode.</p>
+                    </div>
+                    <button type="button" class="btn btn-outline-sm" onclick="showPatientSearchScreen()">
+                        ← Back to Patient Directory
+                    </button>
+                </div>
+
+                <!-- Patient Selected Banner -->
+                <div id="selected-patient-banner" style="margin-bottom:20px;padding:12px 18px;background:rgba(0,229,255,0.08);border:1px solid var(--cyan);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;">
+                    <div>
+                        <span style="font-size:0.75rem;color:var(--text-muted);text-transform:uppercase;">Selected Patient Record</span>
+                        <div id="selected-patient-name" style="font-size:1.1rem;font-weight:700;color:var(--cyan);">John Doe (MRN-2026-0891)</div>
+                    </div>
+                    <span style="padding:4px 10px;border-radius:12px;background:rgba(0,255,157,0.15);color:var(--green);font-size:0.78rem;font-weight:700;">LINKED</span>
+                </div>
+
+                <!-- Language Cards Selection -->
+                <label style="display:block;margin-bottom:12px;font-weight:700;color:var(--text-primary);">
+                    🌐 Choose Conversation Language:
+                </label>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:16px;margin-bottom:24px;">
+                    
+                    <!-- Language 1: Urdu -->
+                    <div class="lang-card" id="lang-card-ur" onclick="setConversationLanguage('ur')" style="cursor:pointer;padding:20px;background:rgba(4,20,38,0.8);border:2px solid rgba(0,229,255,0.2);border-radius:var(--radius-sm);text-align:center;transition:all 0.2s ease;">
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🇵🇰</div>
+                        <h3 style="font-size:1.25rem;color:var(--text-primary);margin:0 0 6px 0;">اردو (Urdu)</h3>
+                        <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;line-height:1.4;">سفارش کی گئی — مکمل اردو بولنے اور سننے کی سہولت</p>
+                    </div>
+
+                    <!-- Language 2: Hindi -->
+                    <div class="lang-card" id="lang-card-hi" onclick="setConversationLanguage('hi')" style="cursor:pointer;padding:20px;background:rgba(4,20,38,0.8);border:2px solid rgba(0,229,255,0.2);border-radius:var(--radius-sm);text-align:center;transition:all 0.2s ease;">
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🇮🇳</div>
+                        <h3 style="font-size:1.25rem;color:var(--text-primary);margin:0 0 6px 0;">हिंदी (Hindi)</h3>
+                        <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;line-height:1.4;">अनुशंसित — पूर्ण हिंदी बोलने और सुनने की सुविधा</p>
+                    </div>
+
+                    <!-- Language 3: English -->
+                    <div class="lang-card active" id="lang-card-en" onclick="setConversationLanguage('en')" style="cursor:pointer;padding:20px;background:rgba(4,20,38,0.8);border:2px solid var(--cyan);border-radius:var(--radius-sm);text-align:center;transition:all 0.2s ease;">
+                        <div style="font-size:2.5rem;margin-bottom:8px;">🇺🇸</div>
+                        <h3 style="font-size:1.25rem;color:var(--cyan);margin:0 0 6px 0;">English</h3>
+                        <p style="font-size:0.82rem;color:var(--text-secondary);margin:0;line-height:1.4;">Standard clinical dialogue &amp; medical terminology</p>
+                    </div>
+
+                </div>
+
+                <!-- Dual Translation Explanation Banner -->
+                <div style="margin-bottom:24px;padding:14px 18px;background:rgba(0,229,255,0.04);border:1px dashed rgba(0,229,255,0.3);border-radius:var(--radius-sm);display:flex;align-items:center;gap:14px;">
+                    <span style="font-size:1.8rem;">⚡</span>
+                    <div style="font-size:0.85rem;color:var(--text-secondary);line-height:1.4;">
+                        <strong style="color:var(--cyan);">Dual English Translation Active:</strong> Spoken audio and written text in Urdu/Hindi are transcribed via faster-whisper (large-v3) and translated to <strong>English for medical reasoning</strong>, then spoken back to you in your chosen language!
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-primary" onclick="proceedToClinicalIntake()" style="width:100%;padding:14px;font-size:1.05rem;font-weight:700;">
+                    Initiate Clinical Consultation →
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ Screen 3: Doctor Intake & Patient Assessment Workspace ═════════════════════════ -->
+    <div id="screen-intake" class="screen hidden">
+        
+        <!-- Persistent Authenticated User & Physician Control Header Bar -->
+        <div id="logged-user-bar" class="patient-profile-pill" style="margin:16px auto;max-width:1240px;display:flex;justify-content:space-between;align-items:center;padding:12px 18px;background:rgba(2,12,24,0.85);border:1px solid rgba(0,229,255,0.3);border-radius:var(--radius);backdrop-filter:var(--blur);">
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;">
+                <span id="logged-user-role-badge" style="padding:4px 10px;border-radius:6px;background:var(--cyan);color:#020610;font-family:'Orbitron',sans-serif;font-weight:700;font-size:0.75rem;letter-spacing:0.5px;">👨‍⚕️ PHYSICIAN WORKSTATION</span>
+                <div style="display:flex;flex-direction:column;">
+                    <span id="logged-user-name" style="font-weight:700;color:var(--text-primary);font-size:1.02rem;">Dr. Sarah Jenkins, MD</span>
+                    <span id="logged-user-detail" style="font-size:0.78rem;color:var(--text-secondary);">Pulmonology &amp; Internal Medicine &bull; License: MD-98210-NY</span>
+                </div>
+                <!-- Duty Status Selector -->
+                <div style="margin-left:12px;display:flex;align-items:center;gap:6px;background:rgba(0,229,255,0.06);padding:4px 10px;border-radius:20px;border:1px solid rgba(0,229,255,0.2);">
+                    <span style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);"></span>
+                    <select style="background:transparent;border:none;color:var(--green);font-size:0.78rem;font-weight:600;outline:none;cursor:pointer;">
+                        <option value="active" style="background:#0a1626;color:#fff;">🟢 Active Consultation</option>
+                        <option value="rounds" style="background:#0a1626;color:#fff;">🟡 Ward Rounds</option>
+                        <option value="offduty" style="background:#0a1626;color:#fff;">🔵 Off Duty</option>
+                    </select>
+                </div>
+            </div>
+
+            <div style="display:flex;gap:8px;align-items:center;">
+                <!-- Consultation Mode Switcher (Text vs Voice) -->
+                <div class="mode-segmented-control" style="display:flex;background:rgba(0,229,255,0.06);padding:3px;border-radius:20px;border:1px solid rgba(0,229,255,0.25);">
+                    <button type="button" id="mode-btn-text" class="mode-seg-btn active" onclick="setConsultationMode('text')" title="Switch to Text-Based Consultation">💬 Text Mode</button>
+                    <button type="button" id="mode-btn-voice" class="mode-seg-btn" onclick="setConsultationMode('voice')" title="Switch to Voice-Based Consultation (ASR & Natural TTS)">🎙️ Voice Mode</button>
+                </div>
+                <button type="button" class="btn btn-outline-sm" onclick="openDualMemoryModal()" title="Inspect Clinical Memory">🧠 Clinical Memory Hub</button>
+                <button type="button" class="btn btn-outline-sm" onclick="window.location.href='index.html'">← Home Portals</button>
+                <button type="button" class="btn btn-outline-sm" onclick="logoutUser()" style="border-color:rgba(255,75,75,0.4);color:var(--red-alert);">🚪 Logout</button>
+            </div>
+        </div>
+
+        <div class="intake-layout" style="max-width:1240px;margin:0 auto;padding-bottom:30px;">
+
+            <!-- Left Brand & Clinical Stats Panel -->
+            <div class="intake-brand">
+                <div class="holo-reticle-wrap" aria-hidden="true">
+                    <div class="holo-ring-outer"></div>
+                    <div class="holo-ring-inner"></div>
+                </div>
+
+                <div class="brand-logo">
+                    <div class="brand-icon">
+                        <svg viewBox="0 0 40 40" fill="none" width="28" height="28">
+                            <rect x="17" y="4" width="6" height="32" rx="3" fill="currentColor"/>
+                            <rect x="4" y="17" width="32" height="6" rx="3" fill="currentColor"/>
+                            <circle cx="20" cy="20" r="4" fill="currentColor" opacity="0.5"/>
+                        </svg>
+                    </div>
+                    <h1>MedAI</h1>
+                </div>
+                <p class="brand-tagline">Doctor Consultation &amp; Reasoning Workstation</p>
+
+                <!-- Live System Telemetry Stat Badges -->
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0;padding:12px;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.15);border-radius:var(--radius-sm);">
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;">AI Diagnostic Precision</div>
+                        <div style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:var(--cyan);">98.4%</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;">Active AI Pipeline</div>
+                        <div style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:var(--green);">9 Agents</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;">Average Triage Speed</div>
+                        <div style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:var(--violet);">&lt; 1.2s</div>
+                    </div>
+                    <div>
+                        <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;">ICD-10 Mapped Database</div>
+                        <div style="font-family:'Orbitron',sans-serif;font-size:1.1rem;font-weight:700;color:var(--amber);">70,000+</div>
+                    </div>
+                </div>
+
+                <div class="brand-features">
+                    <div class="feature-item"><span class="feature-dot cyan"></span><span>Autonomous Triage &amp; Urgency Level 1-5</span></div>
+                    <div class="feature-item"><span class="feature-dot blue"></span><span>Adaptive Dynamic Questioning Pipeline</span></div>
+                    <div class="feature-item"><span class="feature-dot purple"></span><span>Multi-Modal DICOM &amp; Lab Diagnostic Engine</span></div>
+                    <div class="feature-item"><span class="feature-dot green"></span><span>ICD-10 Differential Diagnosis &amp; Evidence Matrix</span></div>
+                    <div class="feature-item"><span class="feature-dot cyan"></span><span>Safety Validated Treatment &amp; Prescriptions</span></div>
+                </div>
+
+                <div class="brand-disclaimer">
+                    <span class="disclaimer-icon">⚠️</span>
+                    For licensed physician use &amp; decision support only. Clinical judgment remains the final authority.
+                </div>
+            </div>
+
+            <!-- Right Form Panel -->
+            <div class="intake-form-panel">
+                <div class="intake-form-card" id="doctor-assessment-panel">
+                    <div class="hud-corner tl"></div>
+                    <div class="hud-corner tr"></div>
+                    <div class="hud-corner bl"></div>
+                    <div class="hud-corner br"></div>
+
+                    <div class="form-header" style="display:flex;justify-content:space-between;align-items:flex-start;">
+                        <div>
+                            <span class="form-step-badge">// CLINICAL ASSESSMENT INITIATION</span>
+                            <h2>Initiate Patient Consultation</h2>
+                            <p>Link patient record, review longitudinal data, or select clinical presentation presets.</p>
+                        </div>
+                        <button type="button" class="btn btn-outline-sm" onclick="window.location.href='index.html'" title="Back to Portal Selection">
+                            ← Back to Portals
+                        </button>
+                    </div>
+
+                    <form id="intake-form">
+                        <!-- Step 1: Patient Selection & Record Linking -->
+                        <div class="input-group" style="margin-bottom:16px;">
+                            <label for="patient-account-select">
+                                <span class="label-icon">👤</span>
+                                <strong>Step 1: Select or Link Patient Record</strong>
+                            </label>
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                <select id="patient-account-select" class="patient-select-input" style="flex:1;min-width:220px;" onchange="onPatientSelectChange(this.value)">
+                                    <option value="pat-001">John Doe (MRN-2026-0891) — Male, 50y — Asthma, Penicillin Allergy</option>
+                                    <option value="pat-002">Jane Miller (MRN-2026-1042) — Female, 41y — HTN, Type 2 DM</option>
+                                    <option value="pat-003">Robert Chen (MRN-2026-0419) — Male, 68y — COPD, Sulfa Allergy</option>
+                                    <option value="new">+ Search / Link Other Patient...</option>
+                                </select>
+                                <button type="button" class="btn btn-outline-sm" onclick="openAdminPortalModal()" style="border-color:var(--green-accent);color:var(--green-accent);white-space:nowrap;">+ Register New Patient</button>
+                                <button type="button" class="btn btn-outline-sm" onclick="openDualMemoryModal()" style="white-space:nowrap;">🧠 Patient Memory Hub</button>
+                            </div>
+                            <div id="patient-profile-pill" class="patient-profile-pill">
+                                🟢 <strong>Patient:</strong> John Doe (Male, 50y) &bull; <strong>MRN:</strong> MRN-2026-0891 &bull; <strong>Allergies:</strong> <span style="color:var(--red-alert);font-weight:700;">Penicillin (Anaphylaxis)</span> &bull; <strong>Active Dx:</strong> Asthma (J45.909), HTN
+                            </div>
+                        </div>
+
+                        <!-- Step 2: Quick Clinical Presentation Presets -->
+                        <div class="input-group" style="margin-bottom:16px;">
+                            <label>
+                                <span class="label-icon">⚡</span>
+                                <strong>Step 2: Quick Clinical Intake Presets (Optional)</strong>
+                            </label>
+                            <div class="preset-pill-group">
+                                <button type="button" class="preset-pill" onclick="selectClinicalPreset('dyspnea')">🫁 Dyspnea &amp; Wheezing (Asthma)</button>
+                                <button type="button" class="preset-pill" onclick="selectClinicalPreset('chestpain')">🫀 Retrosternal Chest Pain (ACS)</button>
+                                <button type="button" class="preset-pill" onclick="selectClinicalPreset('pneumonia')">🤒 Fever &amp; Productive Cough (Pneumonia)</button>
+                                <button type="button" class="preset-pill" onclick="selectClinicalPreset('migraine')">⚡ Unilateral Headache &amp; Scotoma (Migraine)</button>
+                                <button type="button" class="preset-pill" onclick="selectClinicalPreset('htn_crisis')">🩸 Occipital Headache &amp; High BP (HTN Crisis)</button>
+                            </div>
+                        </div>
+
+                        <!-- Step 3: Doctor Baseline Vitals Assessment Matrix -->
+                        <div class="input-group" style="margin-bottom:16px;">
+                            <label>
+                                <span class="label-icon">🩺</span>
+                                <strong>Step 3: Baseline Vitals Matrix (Recorded by Physician)</strong>
+                            </label>
+                            <div class="doc-vitals-bar" style="margin-top:4px;">
+                                <div class="doc-vitals-chip">
+                                    <span class="v-label">BP:</span>
+                                    <input type="text" id="vitals-bp" value="138/85" style="width:65px;background:transparent;border:none;color:var(--cyan);font-weight:700;font-size:0.8rem;outline:none;" placeholder="120/80">
+                                    <span style="font-size:0.68rem;color:var(--text-muted);">mmHg</span>
+                                </div>
+                                <div class="doc-vitals-chip">
+                                    <span class="v-label">HR:</span>
+                                    <input type="text" id="vitals-hr" value="92" style="width:40px;background:transparent;border:none;color:var(--cyan);font-weight:700;font-size:0.8rem;outline:none;" placeholder="72">
+                                    <span style="font-size:0.68rem;color:var(--text-muted);">bpm</span>
+                                </div>
+                                <div class="doc-vitals-chip warning">
+                                    <span class="v-label">SpO2:</span>
+                                    <input type="text" id="vitals-spo2" value="94" style="width:40px;background:transparent;border:none;color:var(--amber);font-weight:700;font-size:0.8rem;outline:none;" placeholder="98">
+                                    <span style="font-size:0.68rem;color:var(--amber);">% RA</span>
+                                </div>
+                                <div class="doc-vitals-chip">
+                                    <span class="v-label">Temp:</span>
+                                    <input type="text" id="vitals-temp" value="37.2" style="width:40px;background:transparent;border:none;color:var(--cyan);font-weight:700;font-size:0.8rem;outline:none;" placeholder="36.8">
+                                    <span style="font-size:0.68rem;color:var(--text-muted);">°C</span>
+                                </div>
+                                <div class="doc-vitals-chip">
+                                    <span class="v-label">RR:</span>
+                                    <input type="text" id="vitals-rr" value="22" style="width:40px;background:transparent;border:none;color:var(--cyan);font-weight:700;font-size:0.8rem;outline:none;" placeholder="16">
+                                    <span style="font-size:0.68rem;color:var(--text-muted);">/min</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Step 4: Patient Presentation & Chief Complaint -->
+                        <div class="input-group" style="margin-bottom:20px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:8px;">
+                                <label for="patient-description" style="margin-bottom:0;">
+                                    <span class="label-icon">📋</span>
+                                    <strong>Step 4: Clinical Presentation &amp; Chief Complaint</strong>
+                                </label>
+                                <div style="display:flex;gap:6px;align-items:center;">
+                                    <span id="intake-lang-pill" class="badge hidden" style="background:rgba(0,229,255,0.15);color:var(--cyan);border:1px solid rgba(0,229,255,0.3);font-size:0.75rem;padding:2px 8px;border-radius:12px;"></span>
+                                    <button type="button" class="btn btn-outline-sm" id="btn-voice-dictate" onclick="toggleVoiceDictation('patient-description')" style="font-size:0.78rem;padding:4px 10px;border-color:var(--cyan);color:var(--cyan);">
+                                        🎙️ Voice Dictate (Urdu / Hindi / Eng)
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Live Voice Status Banner -->
+                            <div id="intake-voice-banner" class="hidden" style="margin-bottom:8px;padding:8px 12px;background:rgba(0,229,255,0.08);border:1px solid var(--cyan);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <span class="pulse-dot red" id="intake-mic-pulse"></span>
+                                    <span id="intake-voice-status-text" style="font-weight:600;color:var(--cyan);">Recording... Speak in Urdu, Hindi, or English</span>
+                                    <span id="intake-voice-timer" style="font-family:'JetBrains Mono',monospace;color:var(--text-secondary);font-size:0.8rem;">00:00</span>
+                                </div>
+                                <div style="display:flex;gap:6px;">
+                                    <button type="button" class="btn btn-outline-sm" onclick="stopVoiceDictation(true)" style="padding:2px 8px;font-size:0.72rem;border-color:var(--green);color:var(--green);">Done ✓</button>
+                                    <button type="button" class="btn btn-ghost" onclick="cancelVoiceDictation()" style="padding:2px 8px;font-size:0.72rem;color:var(--red-alert);">Cancel ✕</button>
+                                </div>
+                            </div>
+                            <textarea
+                                id="patient-description"
+                                rows="5"
+                                placeholder="e.g., 50-year-old male presenting with shortness of breath that comes and goes, triggered by heavy duty work. History of asthma and severe penicillin allergy."
+                            >50-year-old male presenting with shortness of breath that comes and goes, triggered by heavy duty work. History of mild asthma and severe penicillin allergy.</textarea>
+                            <div class="char-hint" style="display:flex;justify-content:space-between;">
+                                <span>&gt;_ Describe symptoms, onset, triggers, and physical findings for high-precision multi-agent reasoning</span>
+                                <span id="intake-comfort-msg" style="color:var(--cyan);font-weight:600;"></span>
+                            </div>
+                        </div>
+
+                        <!-- Step 5: Initiate Assessment Button -->
+                        <button type="submit" class="btn btn-primary" id="start-btn" style="width:100%;padding:14px;font-size:1.05rem;font-weight:700;">
+                            <span class="btn-text">Initiate Multi-Agent Clinical Reasoning</span>
+                            <span class="btn-arrow" style="font-size:1.2rem;">→</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ Screen 2: Active Workstation (Multi-Tab Clinical Workstation) ═════════════════ -->
+    <div id="screen-active" class="screen hidden">
+        <header class="app-header">
+            <div class="header-logo">
+                <div class="header-icon">
+                    <svg viewBox="0 0 24 24" fill="none" width="16" height="16"><rect x="10.5" y="3" width="3" height="18" rx="1.5" fill="currentColor"/><rect x="3" y="10.5" width="18" height="3" rx="1.5" fill="currentColor"/></svg>
+                </div>
+                <span class="header-title">MedAI Workstation</span>
+                <span class="header-divider">|</span>
+                <span class="header-subtitle">Multi-Agent Decision Support</span>
+            </div>
+
+            <div class="header-center" id="header-ai-status">
+                <div class="ai-thinking-indicator" id="ai-indicator">
+                    <span class="pulse-dot"></span>
+                    <span id="ai-status-text">Initializing Clinical Pipeline...</span>
+                </div>
+            </div>
+
+            <div class="header-right" style="display:flex;align-items:center;gap:8px;">
+                <!-- Consultation Mode Switcher (Text vs Voice) -->
+                <div class="mode-segmented-control" style="display:flex;background:rgba(0,229,255,0.06);padding:2px;border-radius:20px;border:1px solid rgba(0,229,255,0.25);">
+                    <button type="button" id="header-mode-btn-text" class="mode-seg-btn active" onclick="setConsultationMode('text')" title="Switch to Text-Based Consultation">💬 Text</button>
+                    <button type="button" id="header-mode-btn-voice" class="mode-seg-btn" onclick="setConsultationMode('voice')" title="Switch to Voice-Based Consultation">🎙️ Voice</button>
+                </div>
+                <button type="button" class="btn btn-outline-sm" onclick="openDualMemoryModal()" title="Inspect Memory">
+                    <span>🧠 Memory Hub</span>
+                </button>
+                <button type="button" class="btn btn-outline-sm" onclick="openAgentInspector()" title="Inspect Telemetry">
+                    <span>🤖 Telemetry Hub</span>
+                </button>
+                <button type="button" class="btn-sfx active" id="btn-sfx-toggle" title="Toggle SFX">
+                    <span id="sfx-icon">🔊</span>
+                    <span>SFX ON</span>
+                </button>
+                <span class="system-badge" id="status-badge">🟢 Session Active</span>
+                <button class="btn-icon" onclick="resetApp()" title="New Consultation Session" id="new-session-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Doctor Multi-Tab Navigation Toolbar -->
+        <nav class="doc-workspace-nav">
+            <button type="button" class="doc-tab-btn active" id="tab-btn-chat" onclick="switchDocTab('chat')">
+                <span>💬 AI Clinical Stream &amp; Interactive Q&amp;A</span>
+            </button>
+            <button type="button" class="doc-tab-btn" id="tab-btn-diff" onclick="switchDocTab('diff')">
+                <span>🎯 ICD-10 Differential &amp; Knowledge Graph</span>
+            </button>
+            <button type="button" class="doc-tab-btn" id="tab-btn-labs" onclick="switchDocTab('labs')">
+                <span>🧪 Diagnostic DICOM Imaging &amp; Labs</span>
+            </button>
+            <button type="button" class="doc-tab-btn" id="tab-btn-soap" onclick="switchDocTab('soap')">
+                <span>✍️ Auto SOAP Note &amp; e-Prescription Studio</span>
+            </button>
+            <button type="button" class="doc-tab-btn" id="tab-btn-history" onclick="switchDocTab('history')">
+                <span>📜 Patient Longitudinal Timeline</span>
+            </button>
+        </nav>
+
+        <!-- Main 3-Column Layout -->
+        <div class="workspace">
+            <!-- Left Sidebar: 9-Agent Workflow Pipeline -->
+            <aside class="sidebar-left">
+                <div class="sidebar-section-title">// 9-Agent Workflow Graph</div>
+                <nav class="workflow-nav" id="workflow-nav">
+                    <div class="workflow-step" data-phase="intake" id="step-intake" onclick="openAgentInspector('intake_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Intake Agent</div></div></div>
+                    </div>
+                    <div class="workflow-step" data-phase="triage" id="step-triage" onclick="openAgentInspector('triage_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Triage Agent</div></div></div>
+                    </div>
+                    <div class="workflow-step" data-phase="questioning" id="step-questioning" onclick="openAgentInspector('questioner_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Questioner Agent</div></div></div>
+                    </div>
+                    <div class="workflow-step" data-phase="case_building" id="step-case_building" onclick="openAgentInspector('case_builder_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Case Builder</div></div></div>
+                    </div>
+                    <div class="workflow-step" data-phase="investigation_waiting" id="step-investigation_waiting" onclick="openAgentInspector('investigator_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Investigator</div></div></div>
+                    </div>
+                    <div class="workflow-step" data-phase="diagnosis" id="step-diagnosis" onclick="openAgentInspector('diagnostician_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Diagnostician</div></div></div>
+                    </div>
+                    <div class="workflow-step" data-phase="treatment" id="step-treatment" onclick="openAgentInspector('treatment_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Treatment Agent</div></div></div>
+                    </div>
+                    <div class="workflow-step" data-phase="validation" id="step-validation" onclick="openAgentInspector('validator_agent')">
+                        <div class="wf-node"><div class="wf-label"><div class="wf-name">Validator Agent</div></div></div>
+                    </div>
+                </nav>
+                <div class="patient-strip" id="patient-strip">
+                    <div class="patient-strip-label">// Active Patient</div>
+                    <div class="patient-strip-content" id="patient-strip-text">John Doe (50y, M) &bull; MRN-2026-0891</div>
+                </div>
+            </aside>
+
+            <!-- Center Main Content Panes (Tabbed) -->
+            <main class="main-panel" style="padding:0;display:flex;flex-direction:column;overflow:hidden;">
+                
+                <!-- TAB 1: AI Clinical reasoning & Chat Stream -->
+                <div id="doc-pane-chat" class="doc-tab-pane active">
+
+                    <!-- Emergency Banner (collapsible, hidden by default) -->
+                    <div id="emergency-banner" class="emergency-banner hidden" style="flex-shrink:0;">
+                        <div class="emergency-banner-header">
+                            <span class="emergency-icon-lg">🚨</span>
+                            <div>
+                                <div class="emergency-title">CRITICAL EMERGENCY DETECTED</div>
+                                <div class="emergency-subtitle">Immediate medical intervention required. AI decision support disabled.</div>
+                            </div>
+                        </div>
+                        <div id="emergency-actions-list" class="emergency-actions"></div>
+                        <div id="emergency-do-not-list" class="emergency-do-not"></div>
+                    </div>
+
+                    <!-- Phase Progress Bar (fixed height at top) -->
+                    <div class="phase-context-bar" id="phase-context-bar" style="flex-shrink:0;">
+                        <div class="phase-context-inner">
+                            <div class="phase-spinner" id="phase-spinner"><div class="spinner-ring"></div></div>
+                            <div class="phase-context-text" id="phase-context-text">Initializing multi-agent clinical assessment pipeline...</div>
+                        </div>
+                        <div class="phase-progress-bar"><div class="phase-progress-fill" id="phase-progress-fill"></div></div>
+                    </div>
+
+                    <!-- Chat Messages (scrollable, fills remaining space) -->
+                    <div class="chat-area" id="chat-messages">
+                        <div class="chat-welcome">
+                            <div class="chat-welcome-icon">🩺</div>
+                            <h3>Physician Decision Support Active</h3>
+                            <p>MedAI multi-agent engine is synthesizing clinical evidence...</p>
+                        </div>
+                    </div>
+
+                    <!-- Bottom Input Dock (shrinks to content, never overlaps messages) -->
+                    <div class="chat-input-dock">
+
+                        <!-- Lab & Imaging Submission Wrap -->
+                        <div id="test-results-input-wrap" class="test-results-wrap hidden">
+                            <div class="test-results-header">
+                                🔬 <strong>Investigator Agent</strong> has identified the required diagnostic tests.
+                                Please <strong>paste the results as text</strong> below, or <strong>attach an image</strong> if available.
+                            </div>
+                            <form id="test-results-form" class="test-results-form">
+                                <textarea id="test-results-input" rows="2" placeholder="e.g. WBC 8.4 x10³/µL, eosinophils 7.2%, CXR: hyperinflation bilateral, ABG pH 7.42..."></textarea>
+                                <div class="test-results-actions">
+                                    <button type="button" class="btn btn-outline-sm" onclick="document.getElementById('test-image-upload').click()">📎 Attach Image</button>
+                                    <input type="file" id="test-image-upload" accept="image/*" class="hidden">
+                                    <div id="test-image-upload-status" class="hidden" style="font-size:0.8rem;color:var(--cyan);white-space:nowrap;"></div>
+                                    <div style="flex:1;"></div>
+                                    <button type="submit" class="btn btn-primary" id="submit-tests-btn">Submit Results →</button>
+                                    <button type="button" class="btn btn-ghost" id="skip-tests-btn">Skip ⏩</button>
+                                </div>
+                            </form>
+                        </div>
+
+                        <!-- QA Chat Input Wrap -->
+                        <div class="chat-input-wrap hidden" id="chat-input-wrap">
+                            <div class="chat-input-header">
+                                <div class="chat-input-label">
+                                    <span class="input-prompt-dot"></span>
+                                    <span>Physician &amp; Patient Voice Response:</span>
+                                    <span id="qa-lang-pill" class="badge hidden" style="background:rgba(0,229,255,0.15);color:var(--cyan);border:1px solid rgba(0,229,255,0.3);font-size:0.75rem;padding:2px 8px;border-radius:12px;margin-left:6px;"></span>
+                                </div>
+                                <div id="quick-reply-chips" class="quick-chips">
+                                    <button type="button" class="preset-pill" onclick="quickFillAnswer('No retrosternal chest pain or radiation reported.')">❌ No Chest Pain</button>
+                                    <button type="button" class="preset-pill" onclick="quickFillAnswer('Symptoms worsen with physical exertion and at night.')">🌙 Worse at Night</button>
+                                    <button type="button" class="preset-pill" onclick="quickFillAnswer('Auscultation reveals bilateral expiratory wheezing.')">🫁 Expiratory Wheeze</button>
+                                    <button type="button" class="preset-pill" onclick="quickFillAnswer('Patient denies fever, chills, or night sweats.')">🌡️ Denies Fever</button>
+                                    <button type="button" class="preset-pill" onclick="quickFillAnswer('Currently taking Albuterol 90mcg inhaler as needed.')">💊 Uses Albuterol</button>
+                                </div>
+                            </div>
+
+                            <!-- Live QA Voice Recording HUD Banner -->
+                            <div id="qa-voice-banner" class="hidden" style="margin:8px 0;padding:8px 12px;background:rgba(0,229,255,0.08);border:1px solid var(--cyan);border-radius:var(--radius-sm);display:flex;align-items:center;justify-content:space-between;font-size:0.82rem;">
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <span class="pulse-dot red" id="qa-mic-pulse"></span>
+                                    <span id="qa-voice-status-text" style="font-weight:600;color:var(--cyan);">Recording... Speak in Urdu, Hindi, or English</span>
+                                    <span id="qa-voice-timer" style="font-family:'JetBrains Mono',monospace;color:var(--text-secondary);font-size:0.8rem;">00:00</span>
+                                </div>
+                                <div style="display:flex;gap:6px;">
+                                    <button type="button" class="btn btn-outline-sm" onclick="stopVoiceDictation(true)" style="padding:2px 8px;font-size:0.72rem;border-color:var(--green);color:var(--green);">Done ✓</button>
+                                    <button type="button" class="btn btn-ghost" onclick="cancelVoiceDictation()" style="padding:2px 8px;font-size:0.72rem;color:var(--red-alert);">Cancel ✕</button>
+                                </div>
+                            </div>
+
+                            <form id="qa-form" class="qa-form-bar">
+                                <textarea id="answer-input" rows="2" placeholder="Type clinical findings, or click 🎙️ Voice Input to speak in Urdu, Hindi, or English..."></textarea>
+                                <div class="qa-form-actions">
+                                    <button type="button" class="btn btn-outline-sm" id="btn-qa-voice" onclick="toggleVoiceDictation('answer-input')" style="border-color:var(--cyan);color:var(--cyan);">
+                                        🎙️ Voice (Urdu / Hindi / Eng)
+                                    </button>
+                                    <button type="button" class="btn btn-outline-sm" id="btn-tts-toggle" onclick="toggleAutoSpeak()" style="border-color:rgba(0,229,255,0.3);color:var(--text-secondary);" title="Automatically read aloud incoming AI responses (Text-to-Speech). To capture microphone input, click 🎙️ Voice.">
+                                        🔊 Auto-Read AI (TTS): <span id="auto-speak-state">OFF</span>
+                                    </button>
+                                    <button type="button" class="btn btn-outline-sm" id="btn-upload-image" onclick="document.getElementById('image-upload').click()">📎 Image</button>
+                                    <input type="file" id="image-upload" accept="image/*" class="hidden">
+                                    <div id="image-upload-status" class="hidden" style="font-size:0.8rem;color:var(--cyan);white-space:nowrap;"></div>
+                                    <div style="flex:1;"></div>
+                                    <button type="submit" class="btn btn-primary" id="send-answer-btn">Submit →</button>
+                                </div>
+                            </form>
+                            <div id="qa-comfort-banner" style="font-size:0.8rem;color:var(--cyan);font-weight:600;margin-top:4px;display:none;"></div>
+                        </div>
+
+                    </div><!-- /.chat-input-dock -->
+                </div><!-- /#doc-pane-chat -->
+
+                <!-- TAB 2: Differential Diagnosis & Knowledge Graph -->
+                <div id="doc-pane-diff" class="doc-tab-pane">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+                                🎯 ICD-10 Differential Diagnosis Matrix
+                            </h3>
+                            <div class="report-card" style="margin-bottom:16px;">
+                                <table style="width:100%;border-collapse:collapse;font-size:0.86rem;">
+                                    <thead>
+                                        <tr style="border-bottom:1px solid rgba(0,229,255,0.2);color:var(--text-muted);text-align:left;">
+                                            <th style="padding:8px;">ICD-10 / Condition</th>
+                                            <th style="padding:8px;">Confidence</th>
+                                            <th style="padding:8px;">Evidence Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding:10px;font-weight:600;color:var(--text-primary);">
+                                                J45.909 — Acute Asthma Exacerbation
+                                                <div style="font-size:0.75rem;color:var(--text-muted);">Pulmonary / Airway Constriction</div>
+                                            </td>
+                                            <td style="padding:10px;">
+                                                <div style="display:flex;align-items:center;gap:8px;">
+                                                    <div style="flex:1;height:8px;background:rgba(0,229,255,0.1);border-radius:4px;overflow:hidden;">
+                                                        <div style="width:92%;height:100%;background:var(--cyan);box-shadow:0 0 8px var(--cyan);"></div>
+                                                    </div>
+                                                    <span style="font-weight:700;color:var(--cyan);">92%</span>
+                                                </div>
+                                            </td>
+                                            <td style="padding:10px;"><span class="lab-flag high">PRIMARY DX</span></td>
+                                        </tr>
+                                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                                            <td style="padding:10px;font-weight:600;color:var(--text-primary);">
+                                                J18.9 — Community Acquired Pneumonia
+                                                <div style="font-size:0.75rem;color:var(--text-muted);">Infectious / Alveolar Infiltrate</div>
+                                            </td>
+                                            <td style="padding:10px;">
+                                                <div style="display:flex;align-items:center;gap:8px;">
+                                                    <div style="flex:1;height:8px;background:rgba(255,179,0,0.1);border-radius:4px;overflow:hidden;">
+                                                        <div style="width:45%;height:100%;background:var(--amber);"></div>
+                                                    </div>
+                                                    <span style="font-weight:700;color:var(--amber);">45%</span>
+                                                </div>
+                                            </td>
+                                            <td style="padding:10px;"><span class="lab-flag low">SECONDARY</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td style="padding:10px;font-weight:600;color:var(--text-primary);">
+                                                I50.9 — Acute Congestive Heart Failure
+                                                <div style="font-size:0.75rem;color:var(--text-muted);">Cardiovascular / Fluid Overload</div>
+                                            </td>
+                                            <td style="padding:10px;">
+                                                <div style="display:flex;align-items:center;gap:8px;">
+                                                    <div style="flex:1;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;">
+                                                        <div style="width:18%;height:100%;background:var(--text-muted);"></div>
+                                                    </div>
+                                                    <span style="font-weight:700;color:var(--text-muted);">18%</span>
+                                                </div>
+                                            </td>
+                                            <td style="padding:10px;"><span class="lab-flag normal">UNLIKELY</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="report-card">
+                                <div class="report-card-header"><span>⚖️ Evidence Analysis Breakdown</span></div>
+                                <div style="font-size:0.84rem;line-height:1.6;color:var(--text-secondary);">
+                                    <div style="margin-bottom:8px;"><strong style="color:var(--green);">Supporting Factors:</strong> Episodic dyspnea, occupational trigger, wheezing history, SpO2 94%.</div>
+                                    <div><strong style="color:var(--red-alert);">Opposing / Rule-out Factors:</strong> Absence of fever, normal chest expansion, no purulent sputum reported.</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--violet);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+                                🕸️ Medical Knowledge Graph Visualizer
+                            </h3>
+                            <div class="dicom-viewer-box" style="padding:20px;">
+                                <div class="dicom-overlay-hud">
+                                    <span>MED-GRAPH NODE MAP v3.2</span>
+                                    <span>ENTITIES: 14 | EDGES: 22</span>
+                                </div>
+                                <svg viewBox="0 0 400 240" style="width:100%;height:220px;">
+                                    <!-- Edge links -->
+                                    <line x1="60" y1="120" x2="160" y2="70" stroke="rgba(0,229,255,0.4)" stroke-width="2" stroke-dasharray="4,4"/>
+                                    <line x1="60" y1="120" x2="160" y2="170" stroke="rgba(180,78,255,0.4)" stroke-width="2"/>
+                                    <line x1="160" y1="70" x2="310" y2="90" stroke="rgba(0,229,255,0.8)" stroke-width="3"/>
+                                    <line x1="160" y1="170" x2="310" y2="90" stroke="rgba(255,179,0,0.5)" stroke-width="2"/>
+                                    <line x1="160" y1="70" x2="310" y2="180" stroke="rgba(0,229,255,0.3)" stroke-width="1"/>
+
+                                    <!-- Nodes -->
+                                    <g transform="translate(60,120)">
+                                        <circle r="24" fill="rgba(0,229,255,0.15)" stroke="var(--cyan)" stroke-width="2"/>
+                                        <text text-anchor="middle" dy="4" fill="var(--text-primary)" font-size="10" font-weight="700">Dyspnea</text>
+                                    </g>
+                                    <g transform="translate(160,70)">
+                                        <circle r="22" fill="rgba(0,229,255,0.2)" stroke="var(--cyan)" stroke-width="2"/>
+                                        <text text-anchor="middle" dy="4" fill="var(--text-primary)" font-size="9" font-weight="700">Bronchospasm</text>
+                                    </g>
+                                    <g transform="translate(160,170)">
+                                        <circle r="22" fill="rgba(180,78,255,0.2)" stroke="var(--violet)" stroke-width="2"/>
+                                        <text text-anchor="middle" dy="4" fill="var(--text-primary)" font-size="9" font-weight="700">Infiltrate</text>
+                                    </g>
+                                    <g transform="translate(310,90)">
+                                        <circle r="28" fill="rgba(0,255,157,0.25)" stroke="var(--green)" stroke-width="3"/>
+                                        <text text-anchor="middle" dy="-2" fill="var(--green)" font-size="10" font-weight="700">Asthma (J45)</text>
+                                        <text text-anchor="middle" dy="10" fill="var(--text-secondary)" font-size="8">92% Conf</text>
+                                    </g>
+                                    <g transform="translate(310,180)">
+                                        <circle r="22" fill="rgba(255,179,0,0.15)" stroke="var(--amber)" stroke-width="2"/>
+                                        <text text-anchor="middle" dy="4" fill="var(--amber)" font-size="9" font-weight="700">Pneumonia</text>
+                                    </g>
+                                </svg>
+                                <div style="font-size:0.75rem;color:var(--text-muted);margin-top:8px;">
+                                    💡 Click any node to highlight supporting pathophysiological pathways &amp; clinical evidence.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Diagnostic DICOM & Labs Center -->
+                <div id="doc-pane-labs" class="doc-tab-pane">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--cyan);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+                                🩻 DICOM Radiology &amp; Image Analyzer
+                            </h3>
+                            <div class="dicom-viewer-box">
+                                <div class="dicom-overlay-hud">
+                                    <span>PATIENT: JOHN DOE (50Y)</span>
+                                    <span>MODALITY: CXR PA VIEW</span>
+                                    <span>STUDY: 2026-07-28</span>
+                                </div>
+                                <div style="position:relative;width:240px;height:220px;background:#050d1a;border-radius:8px;display:flex;align-items:center;justify-content:center;border:1px solid rgba(0,229,255,0.2);">
+                                    <!-- Mock X-Ray visual -->
+                                    <svg viewBox="0 0 200 200" style="width:100%;height:100%;opacity:0.85;">
+                                        <path d="M50 30 C 50 100, 70 170, 90 180 C 70 140, 60 80, 50 30 Z" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.3)"/>
+                                        <path d="M150 30 C 150 100, 130 170, 110 180 C 130 140, 140 80, 150 30 Z" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.3)"/>
+                                        <ellipse cx="100" cy="110" rx="25" ry="35" fill="rgba(255,255,255,0.2)"/>
+                                    </svg>
+                                    <!-- ROI Bounding Box -->
+                                    <div class="dicom-roi-box" style="top:50px;left:45px;width:60px;height:70px;">
+                                        <span style="font-size:0.6rem;color:var(--amber);position:absolute;top:-14px;left:0;font-weight:700;">AI ROI #1</span>
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:8px;margin-top:12px;">
+                                    <button type="button" class="btn btn-outline-sm" onclick="alert('Zoom 150% enabled.')">🔍 Zoom</button>
+                                    <button type="button" class="btn btn-outline-sm" onclick="alert('Invert contrast toggled.')">☯ Invert</button>
+                                    <button type="button" class="btn btn-outline-sm" onclick="alert('AI Segmentation highlight active.')">✨ AI ROI Mask</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--green);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+                                🧪 Laboratory Panel &amp; Biomarkers
+                            </h3>
+                            <div class="report-card">
+                                <table class="lab-table-sci">
+                                    <thead>
+                                        <tr>
+                                            <th>Test / Biomarker</th>
+                                            <th>Result</th>
+                                            <th>Ref Range</th>
+                                            <th>Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>WBC Count</td>
+                                            <td><strong>8.4 x10³/µL</strong></td>
+                                            <td>4.5 - 11.0</td>
+                                            <td><span class="lab-flag normal">NORMAL</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Eosinophils %</td>
+                                            <td><strong style="color:var(--red-alert);">7.2 %</strong></td>
+                                            <td>1.0 - 4.0</td>
+                                            <td><span class="lab-flag high">HIGH 🔴</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Serum IgE</td>
+                                            <td><strong style="color:var(--red-alert);">320 IU/mL</strong></td>
+                                            <td>&lt; 100</td>
+                                            <td><span class="lab-flag high">ELEVATED 🔴</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>hs-CRP</td>
+                                            <td><strong>2.1 mg/L</strong></td>
+                                            <td>&lt; 3.0</td>
+                                            <td><span class="lab-flag normal">NORMAL</span></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Arterial pH</td>
+                                            <td><strong>7.42</strong></td>
+                                            <td>7.35 - 7.45</td>
+                                            <td><span class="lab-flag normal">NORMAL</span></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 4: Auto SOAP Note & Prescription Studio -->
+                <div id="doc-pane-soap" class="doc-tab-pane">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+                        <div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                                <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--cyan);margin:0;">
+                                    ✍️ Auto SOAP Note Generator
+                                </h3>
+                                <button type="button" class="btn btn-outline-sm" onclick="copySOAPNote()">📋 Copy to Clipboard</button>
+                            </div>
+                            <div class="soap-box" id="soap-full-content">
+                                <div style="margin-bottom:12px;">
+                                    <div class="soap-section-title">S — SUBJECTIVE</div>
+                                    <div style="font-size:0.84rem;color:var(--text-secondary);line-height:1.5;">
+                                        50-year-old male with history of asthma presents with episodic shortness of breath precipitated by heavy exertion. Patient denies fever, chills, or chest pain. Known anaphylaxis to Penicillin.
+                                    </div>
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <div class="soap-section-title">O — OBJECTIVE</div>
+                                    <div style="font-size:0.84rem;color:var(--text-secondary);line-height:1.5;">
+                                        Vitals: BP 138/85 mmHg, HR 92 bpm, SpO2 94% RA, Temp 37.2°C, RR 22/min. Diffuse bilateral expiratory wheezing on chest auscultation. Eosinophils elevated at 7.2%.
+                                    </div>
+                                </div>
+                                <div style="margin-bottom:12px;">
+                                    <div class="soap-section-title">A — ASSESSMENT</div>
+                                    <div style="font-size:0.84rem;color:var(--text-secondary);line-height:1.5;">
+                                        1. Acute Mild-to-Moderate Asthma Exacerbation (ICD-10: J45.909) - High confidence (92%).
+                                        2. Penicillin Allergy Alert - Contraindicated.
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="soap-section-title">P — PLAN</div>
+                                    <div style="font-size:0.84rem;color:var(--text-secondary);line-height:1.5;">
+                                        1. Inhaled Albuterol 90mcg 2 puffs q4-6h prn bronchospasm.
+                                        2. Short course oral Prednisone 40mg daily x 5 days.
+                                        3. Avoid beta-blockers &amp; penicillin derivative antibiotics.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--green);margin-bottom:10px;display:flex;align-items:center;gap:8px;">
+                                💊 Electronic Prescription (e-Rx) Studio
+                            </h3>
+                            <div class="report-card" style="padding:16px;">
+                                <div style="margin-bottom:12px;padding:8px 12px;background:rgba(0,255,157,0.08);border:1px solid rgba(0,255,157,0.3);border-radius:var(--radius-sm);font-size:0.8rem;color:var(--green);">
+                                    🛡️ <strong>Safety Check Passed:</strong> Penicillin allergy validation active. No cross-reactivity detected for selected regimen.
+                                </div>
+
+                                <div class="input-group" style="margin-bottom:10px;">
+                                    <label>Select Medication</label>
+                                    <select class="patient-select-input">
+                                        <option>Albuterol Sulfate HFA (90 mcg/actuation Inhaler)</option>
+                                        <option>Prednisone (20 mg Tablet)</option>
+                                        <option>Fluticasone Propionate (110 mcg Inhaler)</option>
+                                        <option>Azithromycin (250 mg Tablet) — Penicillin Safe</option>
+                                    </select>
+                                </div>
+
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                                    <div class="input-group">
+                                        <label>Dosage &amp; Route</label>
+                                        <input type="text" class="patient-select-input" value="2 puffs Inhalation">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Frequency</label>
+                                        <input type="text" class="patient-select-input" value="Every 4-6 hours PRN">
+                                    </div>
+                                </div>
+
+                                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                                    <div class="input-group">
+                                        <label>Quantity / Dispense</label>
+                                        <input type="text" class="patient-select-input" value="1 Inhaler (8.5g)">
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Refills Allowed</label>
+                                        <input type="number" class="patient-select-input" value="2">
+                                    </div>
+                                </div>
+
+                                <button type="button" class="btn btn-primary" style="width:100%;" onclick="alert('Prescription electronically signed &amp; transmitted to pharmacy.')">
+                                    🖋️ Electronically Sign &amp; Authorize e-Rx
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 5: Longitudinal Patient History & Timeline -->
+                <div id="doc-pane-history" class="doc-tab-pane">
+                    <!-- Header -->
+                    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                        <h3 style="font-family:'Orbitron',sans-serif;font-size:1.05rem;color:var(--cyan);display:flex;align-items:center;gap:8px;margin:0;">
+                            📜 Patient Memory &amp; Visit Timeline
+                        </h3>
+                        <button class="btn btn-outline-sm" onclick="loadMemoryTimeline()" id="refresh-timeline-btn" style="font-size:0.78rem;">
+                            🔄 Refresh
+                        </button>
+                    </div>
+
+                    <!-- Doctor Interim Note Panel -->
+                    <div style="background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(59,130,246,0.08));border:1px solid rgba(139,92,246,0.35);border-radius:12px;padding:16px;margin-bottom:18px;">
+                        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+                            <span style="font-size:1.1rem;">👨‍⚕️</span>
+                            <span style="font-family:'Orbitron',sans-serif;font-size:0.82rem;color:var(--violet);font-weight:700;letter-spacing:0.03em;">
+                                ADD DOCTOR INTERIM NOTE
+                            </span>
+                            <span style="font-size:0.72rem;color:var(--text-secondary);font-style:italic;">What happened before the next appointment?</span>
+                        </div>
+                        <textarea
+                            id="interim-note-textarea"
+                            placeholder="e.g. Patient called 3 days after discharge — reports significant improvement in breathing. Peak flow now 380 L/min (baseline 340). Continued Prednisolone taper, no adverse effects. Scheduled for follow-up spirometry next week..."
+                            style="width:100%;min-height:90px;background:rgba(0,0,0,0.3);border:1px solid rgba(139,92,246,0.3);border-radius:8px;color:var(--text-primary);font-size:0.84rem;padding:10px 12px;resize:vertical;font-family:inherit;line-height:1.5;box-sizing:border-box;outline:none;transition:border-color 0.2s;"
+                            onfocus="this.style.borderColor='var(--violet)'"
+                            onblur="this.style.borderColor='rgba(139,92,246,0.3)'"
+                        ></textarea>
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:10px;">
+                            <span id="interim-note-status" style="font-size:0.76rem;color:var(--text-secondary);"></span>
+                            <button
+                                id="interim-note-submit-btn"
+                                class="btn btn-primary"
+                                onclick="submitInterimNote()"
+                                style="font-size:0.8rem;padding:6px 16px;background:linear-gradient(135deg,var(--violet),#4f46e5);border:none;">
+                                💾 Save Note &amp; Generate Memory
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Memory Timeline -->
+                    <div style="font-size:0.76rem;color:var(--text-secondary);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.08em;">
+                        Memory Timeline
+                    </div>
+                    <div id="memory-timeline-container" class="timeline-list">
+                        <!-- Seed items while timeline loads -->
+                        <div class="timeline-item" id="timeline-seed-1">
+                            <div class="timeline-dot"></div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+                                <span style="font-size:0.65rem;background:rgba(6,182,212,0.15);color:var(--cyan);border:1px solid rgba(6,182,212,0.3);border-radius:4px;padding:1px 6px;font-weight:700;">🤖 AI SUMMARY</span>
+                                <span style="font-size:0.73rem;color:var(--cyan);font-weight:700;">JULY 28, 2026</span>
+                            </div>
+                            <div style="font-weight:700;color:var(--text-primary);font-size:0.88rem;margin-top:2px;">Pulmonology Consultation — Acute Asthma Exacerbation</div>
+                            <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:3px;line-height:1.5;">
+                                Patient presented with exertional dyspnea and bilateral expiratory wheeze. Diagnosed: Acute Asthma Exacerbation (J45.901). Prescribed Albuterol nebulizer and Prednisolone 40mg taper. SpO₂ 94%, BP 138/85.
+                            </div>
+                        </div>
+                        <div class="timeline-item" id="timeline-seed-2">
+                            <div class="timeline-dot" style="background:var(--violet);box-shadow:0 0 8px var(--violet);"></div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+                                <span style="font-size:0.65rem;background:rgba(139,92,246,0.15);color:var(--violet);border:1px solid rgba(139,92,246,0.3);border-radius:4px;padding:1px 6px;font-weight:700;">👨‍⚕️ DOCTOR NOTE</span>
+                                <span style="font-size:0.73rem;color:var(--violet);font-weight:700;">MARCH 14, 2026</span>
+                            </div>
+                            <div style="font-weight:700;color:var(--text-primary);font-size:0.88rem;margin-top:2px;">Annual Wellness Exam · Spirometry Review</div>
+                            <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:3px;line-height:1.5;">
+                                Blood pressure 132/82. Spirometry FEV1/FVC ratio 78%. Refilled Albuterol inhaler. Patient stable, continue Lisinopril 10mg.
+                            </div>
+                        </div>
+                        <div class="timeline-item" id="timeline-seed-3">
+                            <div class="timeline-dot" style="background:var(--amber);box-shadow:0 0 8px var(--amber);"></div>
+                            <div style="display:flex;align-items:center;gap:6px;margin-bottom:2px;">
+                                <span style="font-size:0.65rem;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3);border-radius:4px;padding:1px 6px;font-weight:700;">🤖 AI SUMMARY</span>
+                                <span style="font-size:0.73rem;color:var(--amber);font-weight:700;">NOVEMBER 02, 2025</span>
+                            </div>
+                            <div style="font-weight:700;color:var(--text-primary);font-size:0.88rem;margin-top:2px;">Urgent Care Visit — Allergic Reaction Alert</div>
+                            <div style="font-size:0.8rem;color:var(--text-secondary);margin-top:3px;line-height:1.5;">
+                                Severe urticaria and facial edema following oral Amoxicillin. Penicillin allergy confirmed and documented. Treated with IM Epinephrine and oral Diphenhydramine.
+                            </div>
+                        </div>
+
+                        <!-- Loading state placeholder -->
+                        <div id="timeline-loading" style="display:none;text-align:center;padding:20px;color:var(--text-secondary);font-size:0.82rem;">
+                            <div class="spinner" style="width:20px;height:20px;margin:0 auto 8px;"></div>
+                            Loading memory timeline from Supabase...
+                        </div>
+                        <div id="timeline-empty" style="display:none;text-align:center;padding:24px;color:var(--text-secondary);font-size:0.82rem;">
+                            No memory entries yet for this patient.
+                        </div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- Right Sidebar: Live Clinical Findings Cards -->
+            <aside class="sidebar-right">
+                <div class="sidebar-section-title">// Live Clinical Findings</div>
+                <div class="findings-scroll" id="findings-container">
+                    <div id="right-panel-empty" class="right-empty">
+                        <div class="empty-icon">📊</div>
+                        <p>Clinical findings, triage classification, extracted symptoms, and recommended tests will populate here live as the AI pipeline progresses.</p>
+                    </div>
+
+                    <div id="triage-card" class="report-card hidden">
+                        <div class="report-card-header"><span>🚨 Triage Classification</span></div>
+                        <div id="triage-content"></div>
+                    </div>
+                    <div id="symptoms-card" class="report-card hidden">
+                        <div class="report-card-header"><span>📋 Extracted Symptoms</span></div>
+                        <div id="symptoms-content"></div>
+                    </div>
+                    <div id="tests-card" class="report-card hidden">
+                        <div class="report-card-header"><span>🔬 Recommended Investigations</span></div>
+                        <div id="tests-content"></div>
+                    </div>
+                    <div id="diff-card" class="report-card hidden">
+                        <div class="report-card-header"><span>🎯 Differential Diagnosis</span></div>
+                        <div id="diff-content"></div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- ══ Screen 3: Full Final Clinical Assessment Report ═══════════════════════════════ -->
+    <div id="screen-report" class="screen hidden">
+        <header class="app-header">
+            <div class="header-logo">
+                <div class="header-icon" style="background:var(--green-accent);color:#000;">✓</div>
+                <span class="header-title">MedAI</span>
+                <span class="header-divider">|</span>
+                <span class="header-subtitle">Comprehensive Clinical Assessment &amp; Consultation Report</span>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-outline-sm" onclick="window.print()">🖨️ Print / Export PDF</button>
+                <button class="btn btn-primary" onclick="resetApp()">New Consultation →</button>
+            </div>
+        </header>
+
+        <div style="padding:24px;max-width:1150px;margin:0 auto;overflow-y:auto;" id="report-final-content">
+
+            <!-- Safety Banner — renderReport writes class + innerHTML here -->
+            <div id="safety-banner" class="safety-banner safe" style="margin-bottom:18px;"></div>
+
+            <!-- 2-column top row: Primary Dx + Triage -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px;">
+                <div class="report-card">
+                    <div class="report-card-header"><span>🩺 Primary Diagnosis &amp; Confidence</span></div>
+                    <div id="primary-dx-content" style="padding:14px;"></div>
+                </div>
+                <div class="report-card">
+                    <div class="report-card-header"><span>🚨 Triage Level &amp; Validation</span></div>
+                    <div id="report-triage-content" style="padding:14px;"></div>
+                </div>
+            </div>
+
+            <!-- Differential Diagnosis Grid -->
+            <div class="report-card" style="margin-bottom:18px;">
+                <div class="report-card-header">
+                    <span>🎯 ICD-10 Differential Diagnosis</span>
+                    <button type="button" class="btn-inspect-chip" onclick="openAgentInspector('diagnostician_agent')">🔍 Diagnostician Payload</button>
+                </div>
+                <div id="diff-dx-grid"></div>
+            </div>
+
+            <!-- Medications Table -->
+            <div class="report-card" style="margin-bottom:18px;">
+                <div class="report-card-header">
+                    <span>💊 Therapeutic Plan &amp; Prescriptions</span>
+                    <button type="button" class="btn-inspect-chip" onclick="openAgentInspector('treatment_agent')">🔍 Treatment Payload</button>
+                </div>
+                <div id="treatment-content"></div>
+            </div>
+
+            <!-- Lifestyle & Follow-up -->
+            <div class="report-card" style="margin-bottom:18px;">
+                <div class="report-card-header"><span>📅 Lifestyle Modifications &amp; Follow-up Plan</span></div>
+                <div id="lifestyle-content" style="padding:14px;"></div>
+            </div>
+
+            <!-- Physician Signature & Disclaimer -->
+            <div style="padding:14px 18px;background:rgba(0,229,255,0.04);border:1px solid rgba(0,229,255,0.15);border-radius:var(--radius);margin-bottom:18px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                    <span style="font-family:'Orbitron',sans-serif;font-size:0.8rem;color:var(--cyan);">PHYSICIAN SIGNATURE</span>
+                    <span style="font-size:0.75rem;color:var(--green);font-weight:700;">✅ Dr. Sarah Jenkins, MD &bull; LIC #MD-98210-NY</span>
+                </div>
+                <p id="report-disclaimer" style="font-size:0.78rem;color:var(--text-muted);line-height:1.5;margin:0;"></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modals -->
+    <!-- Telemetry Inspector Modal -->
+    <div id="modal-agent-inspector" class="agent-modal-backdrop hidden">
+        <div class="agent-modal-card" style="max-width:960px;">
+            <div class="agent-modal-header">
+                <div class="agent-modal-title"><span>🤖</span><span>MedAI — 9-Agent Pipeline Telemetry Inspector</span></div>
+                <button type="button" class="btn-icon" onclick="closeAgentInspector()">✕</button>
+            </div>
+            <div class="agent-modal-body" style="padding:16px;">
+                <div class="agent-tabs-sidebar" id="agent-tabs-list"></div>
+                <div class="agent-detail-main" id="agent-detail-view"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dual-Tier Memory Modal -->
+    <div id="modal-dual-memory" class="agent-modal-backdrop hidden">
+        <div class="agent-modal-card" style="max-width:900px;">
+            <div class="agent-modal-header">
+                <div class="agent-modal-title"><span>🧠</span><span>MedAI — Dual-Tier Clinical Memory Hub</span></div>
+                <button type="button" class="btn-icon" onclick="closeDualMemoryModal()">✕</button>
+            </div>
+            <div class="agent-modal-body" style="padding:16px;flex-direction:column;overflow-y:auto;">
+                <div style="display:flex;gap:12px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:10px;">
+                    <button type="button" class="btn btn-outline-sm active" id="tab-btn-local-mem" onclick="switchMemoryTab('local')">👤 Local Patient Memory</button>
+                    <button type="button" class="btn btn-outline-sm" id="tab-btn-global-mem" onclick="switchMemoryTab('global')">🌐 Global Agent Memory</button>
+                    <button type="button" class="btn btn-outline-sm" id="tab-btn-followups" onclick="switchMemoryTab('followups')">📅 Scheduled Follow-ups</button>
+                </div>
+                <div id="dual-memory-content" style="font-size:0.88rem;color:var(--text-secondary);line-height:1.6;">Loading...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Registration Modal -->
+    <div id="modal-admin-portal" class="agent-modal-backdrop hidden">
+        <div class="agent-modal-card" style="max-width:640px;height:auto;padding:24px;overflow-y:auto;max-height:90vh;">
+            <div class="agent-modal-header" style="margin-bottom:16px;">
+                <div class="agent-modal-title"><span>🛠️</span><span>Admin Management Portal — Register Accounts</span></div>
+                <button type="button" class="btn-icon" onclick="closeAdminPortalModal()">✕</button>
+            </div>
+            <div style="display:flex;gap:12px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:10px;">
+                <button type="button" class="btn btn-outline-sm active" id="admin-tab-doc" onclick="switchAdminTab('doctor')">👨‍⚕️ Register Doctor Account</button>
+                <button type="button" class="btn btn-outline-sm" id="admin-tab-pat" onclick="switchAdminTab('patient')">👤 Register Patient Account</button>
+            </div>
+            <form id="admin-doctor-form" onsubmit="handleAdminRegisterDoctor(event)">
+                <div class="input-group" style="margin-bottom:10px;"><label>Doctor Full Name</label><input type="text" id="reg-doc-name" placeholder="e.g., Dr. Alex Smith, MD" required class="patient-select-input"></div>
+                <div class="input-group" style="margin-bottom:10px;"><label>Email Address</label><input type="email" id="reg-doc-email" placeholder="e.g., dr.smith@hospital.org" required class="patient-select-input"></div>
+                <div class="input-group" style="margin-bottom:10px;"><label>Password</label><input type="password" id="reg-doc-pass" value="DoctorPass2026!" required class="patient-select-input"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                    <div class="input-group"><label>Medical License Number</label><input type="text" id="reg-doc-license" placeholder="e.g., MD-98210-NY" class="patient-select-input"></div>
+                    <div class="input-group"><label>Specialty</label><input type="text" id="reg-doc-specialty" placeholder="e.g., Cardiology" class="patient-select-input"></div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Create Doctor Account</button>
+            </form>
+            <form id="admin-patient-form" onsubmit="handleAdminRegisterPatient(event)" class="hidden">
+                <div class="input-group" style="margin-bottom:10px;"><label>Patient Full Name</label><input type="text" id="reg-pat-name" placeholder="e.g., Jane Miller" required class="patient-select-input"></div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div class="input-group"><label>Date of Birth</label><input type="date" id="reg-pat-dob" value="1985-05-20" required class="patient-select-input"></div>
+                    <div class="input-group"><label>Gender</label><select id="reg-pat-gender" class="patient-select-input"><option value="female">Female</option><option value="male">Male</option><option value="other">Other</option></select></div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div class="input-group"><label>Medical Record Number (MRN)</label><input type="text" id="reg-pat-mrn" placeholder="Auto-generated if empty" class="patient-select-input"></div>
+                    <div class="input-group"><label>Email Address (Account Login)</label><input type="email" id="reg-pat-email" placeholder="e.g., jane.miller@example.com" class="patient-select-input"></div>
+                </div>
+                <div class="input-group" style="margin-bottom:10px;"><label>Known Allergies</label><input type="text" id="reg-pat-allergies" placeholder="e.g., Sulfa, Latex" class="patient-select-input"></div>
+                <div class="input-group" style="margin-bottom:16px;"><label>Chronic Conditions</label><input type="text" id="reg-pat-chronic" placeholder="e.g., Type 2 Diabetes" class="patient-select-input"></div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Create Patient Account &amp; Profile</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Application Script -->
+    <script src="app.js?v=36"></script>
+
+    <!-- Doctor Workstation Interactive Helpers -->
+    <script>
+        function switchDocTab(tabName) {
+            document.querySelectorAll('.doc-tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.doc-tab-pane').forEach(p => p.classList.remove('active'));
+            const btn = document.getElementById(`tab-btn-${tabName}`);
+            const pane = document.getElementById(`doc-pane-${tabName}`);
+            if (btn) btn.classList.add('active');
+            if (pane) pane.classList.add('active');
+            // Auto-load memory timeline when History tab is opened
+            if (tabName === 'history' && typeof loadMemoryTimeline === 'function') {
+                loadMemoryTimeline();
+            }
+        }
+
+        function selectClinicalPreset(key) {
+            const presets = {
+                dyspnea: "50-year-old male presenting with shortness of breath that comes and goes, triggered by heavy duty work. History of mild asthma and severe penicillin allergy. Vitals: BP 138/85, HR 92 bpm, SpO2 94% on room air.",
+                chestpain: "62-year-old female presenting with retrosternal chest pressure radiating to the left arm for 45 minutes, accompanied by diaphoresis and mild nausea. History of hypertension and hyperlipidemia.",
+                pneumonia: "44-year-old male presenting with 4-day history of productive cough with rust-colored sputum, high grade fever (38.9°C), right-sided pleuritic chest pain, and chills. SpO2 93%.",
+                migraine: "35-year-old female presenting with severe throbbing unilateral headache (8/10), photophobia, phonophobia, and visual scintillating scotoma for 3 hours. No focal neurological deficits.",
+                htn_crisis: "58-year-old male with known hypertension presenting with severe occipital headache, blurred vision, and BP 198/115 mmHg. No prior chest pain or shortness of breath."
+            };
+            const txt = document.getElementById('patient-description');
+            if (txt && presets[key]) {
+                txt.value = presets[key];
+                txt.focus();
+            }
+        }
+
+        function quickFillAnswer(text) {
+            const inputEl = document.getElementById('answer-input');
+            if (inputEl) {
+                inputEl.value = text;
+                inputEl.focus();
+            }
+        }
+
+        function copySOAPNote() {
+            const content = document.getElementById('soap-full-content');
+            if (content) {
+                navigator.clipboard.writeText(content.innerText);
+                alert('SOAP Note copied to clipboard!');
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            if (typeof showDoctorIntakeScreen === 'function') {
+                showDoctorIntakeScreen();
+            }
+        });
+    </script>
+</body>
+</html>

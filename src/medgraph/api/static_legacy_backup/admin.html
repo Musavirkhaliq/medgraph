@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Executive Admin Dashboard — MedAI by LTM Research</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=25">
+</head>
+<body>
+    <div id="screen-admin-dashboard" class="screen active" style="padding:24px;max-width:1240px;margin:0 auto;">
+        <header class="app-header" style="margin-bottom:20px;">
+            <div class="header-logo">
+                <div class="header-icon" style="background:var(--purple-accent);color:#fff;">
+                    🛠️
+                </div>
+                <span class="header-title">MedAI</span>
+                <span class="header-divider">|</span>
+                <span class="header-subtitle" style="color:var(--purple-accent);">Executive System Admin Portal</span>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-outline-sm" onclick="openAdminPortalModal()" style="border-color:var(--purple-accent);color:#d69eff;">+ Register Doctor / Patient</button>
+                <button class="btn btn-outline-sm" onclick="window.location.href='index.html'">← Home Portals</button>
+                <button class="btn btn-outline-sm" onclick="logoutUser()" style="border-color:rgba(255,75,75,0.4);color:var(--red-alert);">🚪 Logout</button>
+            </div>
+        </header>
+
+        <!-- Admin System Metrics Bar -->
+        <div style="display:grid;grid-template-columns:repeat(4, 1fr);gap:14px;margin-bottom:20px;">
+            <div class="memory-card" style="border-left:3px solid var(--purple-accent);">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">ADMIN USER</div>
+                <div style="font-weight:700;color:var(--purple-accent);" id="admin-user-display">Musavir (System Admin)</div>
+            </div>
+            <div class="memory-card" style="border-left:3px solid var(--cyan);">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">SUPABASE DATABASE</div>
+                <div style="font-weight:700;color:var(--cyan);">CONNECTED (qibztyxcadj...)</div>
+            </div>
+            <div class="memory-card" style="border-left:3px solid var(--green-accent);">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">REGISTERED PATIENTS</div>
+                <div style="font-weight:700;color:var(--green-accent);" id="admin-patient-count">2 Active Accounts</div>
+            </div>
+            <div class="memory-card" style="border-left:3px solid #ffb800;">
+                <div style="font-size:0.75rem;color:var(--text-muted);margin-bottom:4px;">GLOBAL MEMORY GRAPH</div>
+                <div style="font-weight:700;color:#ffb800;" id="admin-memory-count">2 Intelligence Clusters</div>
+            </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+            <!-- Registered Doctors & Patients Directory -->
+            <div class="report-card">
+                <div class="report-card-header">
+                    <span>👨‍⚕️ Consulting Physicians &amp; Patient Directory</span>
+                    <button class="btn-inspect-chip" onclick="refreshAdminDirectory()">🔄 Refresh</button>
+                </div>
+                <div id="admin-directory-list" style="font-size:0.86rem;line-height:1.6;color:var(--text-secondary);">
+                    Loading directory from Supabase...
+                </div>
+            </div>
+
+            <!-- Global Knowledge Graph & Collective Intelligence -->
+            <div class="report-card">
+                <div class="report-card-header">
+                    <span>🌐 Cross-Patient Collective Intelligence Graph</span>
+                    <button class="btn-inspect-chip" onclick="openDualMemoryModal()">🧠 Full Memory Hub</button>
+                </div>
+                <div id="admin-global-graph-summary" style="font-size:0.86rem;line-height:1.6;color:var(--text-secondary);">
+                    Loading global intelligence patterns...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Registration Modal -->
+    <div id="modal-admin-portal" class="agent-modal-backdrop hidden">
+        <div class="agent-modal-card" style="max-width:640px;height:auto;padding:24px;overflow-y:auto;max-height:90vh;">
+            <div class="agent-modal-header" style="margin-bottom:16px;">
+                <div class="agent-modal-title">
+                    <span>🛠️</span>
+                    <span>Admin Management Portal — Register Accounts</span>
+                </div>
+                <button type="button" class="btn-icon" onclick="closeAdminPortalModal()">✕</button>
+            </div>
+
+            <div style="display:flex;gap:12px;margin-bottom:16px;border-bottom:1px solid rgba(255,255,255,0.1);padding-bottom:10px;">
+                <button type="button" class="btn btn-outline-sm active" id="admin-tab-doc" onclick="switchAdminTab('doctor')">👨‍⚕️ Register Doctor Account</button>
+                <button type="button" class="btn btn-outline-sm" id="admin-tab-pat" onclick="switchAdminTab('patient')">👤 Register Patient Account</button>
+            </div>
+
+            <form id="admin-doctor-form" onsubmit="handleAdminRegisterDoctor(event)">
+                <div class="input-group" style="margin-bottom:10px;">
+                    <label>Doctor Full Name</label>
+                    <input type="text" id="reg-doc-name" placeholder="e.g., Dr. Alex Smith, MD" required class="patient-select-input">
+                </div>
+                <div class="input-group" style="margin-bottom:10px;">
+                    <label>Email Address</label>
+                    <input type="email" id="reg-doc-email" placeholder="e.g., dr.smith@hospital.org" required class="patient-select-input">
+                </div>
+                <div class="input-group" style="margin-bottom:10px;">
+                    <label>Password</label>
+                    <input type="password" id="reg-doc-pass" value="DoctorPass2026!" required class="patient-select-input">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+                    <div class="input-group">
+                        <label>Medical License Number</label>
+                        <input type="text" id="reg-doc-license" placeholder="e.g., MD-98210-NY" class="patient-select-input">
+                    </div>
+                    <div class="input-group">
+                        <label>Specialty</label>
+                        <input type="text" id="reg-doc-specialty" placeholder="e.g., Cardiology" class="patient-select-input">
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Create Doctor Account</button>
+            </form>
+
+            <form id="admin-patient-form" onsubmit="handleAdminRegisterPatient(event)" class="hidden">
+                <div class="input-group" style="margin-bottom:10px;">
+                    <label>Patient Full Name</label>
+                    <input type="text" id="reg-pat-name" placeholder="e.g., Jane Miller" required class="patient-select-input">
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div class="input-group">
+                        <label>Date of Birth</label>
+                        <input type="date" id="reg-pat-dob" value="1985-05-20" required class="patient-select-input">
+                    </div>
+                    <div class="input-group">
+                        <label>Gender</label>
+                        <select id="reg-pat-gender" class="patient-select-input">
+                            <option value="female">Female</option>
+                            <option value="male">Male</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                    <div class="input-group">
+                        <label>Medical Record Number (MRN)</label>
+                        <input type="text" id="reg-pat-mrn" placeholder="Auto-generated if empty" class="patient-select-input">
+                    </div>
+                    <div class="input-group">
+                        <label>Email Address (Account Login)</label>
+                        <input type="email" id="reg-pat-email" placeholder="e.g., jane.miller@example.com" class="patient-select-input">
+                    </div>
+                </div>
+                <div class="input-group" style="margin-bottom:10px;">
+                    <label>Known Allergies</label>
+                    <input type="text" id="reg-pat-allergies" placeholder="e.g., Sulfa, Latex" class="patient-select-input">
+                </div>
+                <div class="input-group" style="margin-bottom:16px;">
+                    <label>Chronic Conditions</label>
+                    <input type="text" id="reg-pat-chronic" placeholder="e.g., Type 2 Diabetes" class="patient-select-input">
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%;">Create Patient Account &amp; Profile</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js?v=32"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAdminDashboardView();
+        });
+    </script>
+</body>
+</html>

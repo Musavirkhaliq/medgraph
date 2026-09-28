@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedAI by LTM Research | AI Clinical Reasoning Portal Hub</title>
+    <meta name="description" content="AI-powered multi-agent clinical reasoning system — Role Portal Landing Hub">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=29">
+</head>
+<body>
+
+    <!-- Particle canvas -->
+    <canvas id="particle-canvas"></canvas>
+
+    <!-- Scanline overlay -->
+    <div class="scanline-overlay"></div>
+
+    <!-- ══ Role Portal Central Landing Hub ═══════════════════════════════════ -->
+    <div id="screen-intake" class="screen active" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;">
+        <div class="intake-layout" style="max-width:1200px;width:100%;grid-template-columns:1fr 1.5fr;">
+
+            <!-- Left Brand Panel -->
+            <div class="intake-brand">
+                <div class="holo-reticle-wrap" aria-hidden="true">
+                    <div class="holo-ring-outer"></div>
+                    <div class="holo-ring-inner"></div>
+                </div>
+
+                <div class="brand-logo">
+                    <div class="brand-icon">
+                        <svg viewBox="0 0 40 40" fill="none" width="28" height="28">
+                            <rect x="17" y="4" width="6" height="32" rx="3" fill="currentColor"/>
+                            <rect x="4" y="17" width="32" height="6" rx="3" fill="currentColor"/>
+                            <circle cx="20" cy="20" r="4" fill="currentColor" opacity="0.5"/>
+                        </svg>
+                    </div>
+                    <h1>MedAI</h1>
+                </div>
+                <p class="brand-tagline">by LTM Research</p>
+
+                <div class="brand-features">
+                    <div class="feature-item"><span class="feature-dot cyan"></span><span>Autonomous 9-Agent Clinical Reasoning Engine</span></div>
+                    <div class="feature-item"><span class="feature-dot blue"></span><span>Role-Based Access Control (Doctor, Patient, Admin)</span></div>
+                    <div class="feature-item"><span class="feature-dot purple"></span><span>Live Supabase Vector Database &amp; Memory Graph</span></div>
+                    <div class="feature-item"><span class="feature-dot green"></span><span>Multi-Modal Medical Image &amp; DICOM Analysis</span></div>
+                </div>
+
+                <div class="brand-disclaimer">
+                    <span class="disclaimer-icon">⚠️</span>
+                    For research and clinical decision support only. Not a substitute for professional medical judgment.
+                </div>
+            </div>
+
+            <!-- Right Role Selection Portals Grid -->
+            <div class="intake-form-panel" style="display:flex;flex-direction:column;justify-content:center;">
+                <div style="margin-bottom:20px;text-align:center;">
+                    <span class="form-step-badge">// SYSTEM ENTRY PORTALS</span>
+                    <h2 style="font-family:'Orbitron',sans-serif;font-size:1.8rem;color:var(--text-primary);margin-top:6px;">Select System Portal</h2>
+                    <p style="color:var(--text-secondary);font-size:0.9rem;">Choose your role below to log in and access your dedicated medical workspace.</p>
+                </div>
+
+                <div class="role-portal-grid" id="role-landing-grid" style="display:grid;grid-template-columns:1fr;gap:16px;">
+                    <!-- Doctor Role Card -->
+                    <div class="role-portal-card doctor" onclick="quickLoginRole('doctor')" style="cursor:pointer;">
+                        <div style="display:flex;align-items:center;gap:16px;">
+                            <div class="role-portal-icon" style="font-size:2.4rem;">👨‍⚕️</div>
+                            <div style="flex:1;">
+                                <div class="role-portal-title" style="font-size:1.2rem;font-weight:700;color:var(--cyan);">Doctor Portal</div>
+                                <div class="role-portal-desc" style="font-size:0.85rem;color:var(--text-secondary);margin-top:2px;">Consultations, Patient Account Linking &amp; Multi-Agent AI Reasoning</div>
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="event.stopPropagation(); quickLoginRole('doctor')">Enter Doctor Portal →</button>
+                        </div>
+                    </div>
+
+                    <!-- Patient Role Card -->
+                    <div class="role-portal-card patient" onclick="quickLoginRole('patient')" style="cursor:pointer;">
+                        <div style="display:flex;align-items:center;gap:16px;">
+                            <div class="role-portal-icon" style="font-size:2.4rem;">👤</div>
+                            <div style="flex:1;">
+                                <div class="role-portal-title" style="font-size:1.2rem;font-weight:700;color:var(--green-accent);">Patient Portal</div>
+                                <div class="role-portal-desc" style="font-size:0.85rem;color:var(--text-secondary);margin-top:2px;">My Medical Records, Active Prescriptions, Allergies &amp; Follow-up Schedule</div>
+                            </div>
+                            <button type="button" class="btn btn-primary" style="background:linear-gradient(135deg, #00ff9d 0%, #00b86b 100%);color:#000;" onclick="event.stopPropagation(); quickLoginRole('patient')">Enter Patient Portal →</button>
+                        </div>
+                    </div>
+
+                    <!-- Admin Role Card -->
+                    <div class="role-portal-card admin" onclick="quickLoginRole('admin')" style="cursor:pointer;">
+                        <div style="display:flex;align-items:center;gap:16px;">
+                            <div class="role-portal-icon" style="font-size:2.4rem;">🛠️</div>
+                            <div style="flex:1;">
+                                <div class="role-portal-title" style="font-size:1.2rem;font-weight:700;color:var(--purple-accent);">System Admin</div>
+                                <div class="role-portal-desc" style="font-size:0.85rem;color:var(--text-secondary);margin-top:2px;">Executive Admin, Register Doctor Accounts &amp; Patient Profiles</div>
+                            </div>
+                            <button type="button" class="btn btn-primary" style="background:linear-gradient(135deg, #b44eff 0%, #7000ff 100%);" onclick="event.stopPropagation(); quickLoginRole('admin')">Enter Admin Portal →</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ Authentication Login Modal ═══════════════════════════════════════ -->
+    <div id="modal-doctor-auth" class="agent-modal-backdrop hidden">
+        <div class="agent-modal-card" style="max-width:480px;height:auto;padding:24px;">
+            <div class="agent-modal-header" style="margin-bottom:16px;">
+                <div class="agent-modal-title">
+                    <span>🔐</span>
+                    <span id="auth-modal-role-title">Account Authentication Login</span>
+                </div>
+                <button type="button" class="btn-icon" onclick="closeDoctorAuthModal()">✕</button>
+            </div>
+
+            <form id="doctor-auth-form" onsubmit="handleAuthSubmit(event)">
+                <div class="input-group" style="margin-bottom:14px;">
+                    <label for="auth-email">
+                        <span class="label-icon">✉️</span>
+                        Email Address
+                    </label>
+                    <input type="email" id="auth-email" value="doctor@medai.ltm" required class="patient-select-input">
+                </div>
+
+                <div class="input-group" style="margin-bottom:20px;">
+                    <label for="auth-password">
+                        <span class="label-icon">🔑</span>
+                        Password
+                    </label>
+                    <input type="password" id="auth-password" value="password123" required class="patient-select-input">
+                </div>
+
+                <button type="submit" class="btn btn-primary" style="width:100%;padding:12px;" id="auth-submit-btn">
+                    Authenticate &amp; Access Portal →
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js?v=32"></script>
+    <script>
+        // Ambient particle animation
+        const canvas = document.getElementById('particle-canvas');
+        const ctx = canvas.getContext('2d');
+        let width = canvas.width = window.innerWidth;
+        let height = canvas.height = window.innerHeight;
+
+        window.addEventListener('resize', () => {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+        });
+
+        const particles = Array.from({ length: 40 }, () => ({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            vx: (Math.random() - 0.5) * 0.4,
+            vy: (Math.random() - 0.5) * 0.4,
+            radius: Math.random() * 1.5 + 0.5,
+            alpha: Math.random() * 0.4 + 0.1
+        }));
+
+        function drawParticles() {
+            ctx.clearRect(0, 0, width, height);
+            particles.forEach(p => {
+                p.x += p.vx; p.y += p.vy;
+                if (p.x < 0) p.x = width;
+                if (p.x > width) p.x = 0;
+                if (p.y < 0) p.y = height;
+                if (p.y > height) p.y = 0;
+
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(0, 229, 255, ${p.alpha})`;
+                ctx.fill();
+            });
+            requestAnimationFrame(drawParticles);
+        }
+        drawParticles();
+    </script>
+</body>
+</html>

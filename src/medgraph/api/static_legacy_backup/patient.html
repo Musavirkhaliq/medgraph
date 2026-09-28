@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Patient Self-Service Portal — MedAI by LTM Research</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;900&family=Rajdhani:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css?v=25">
+</head>
+<body>
+    <div id="screen-patient-portal" class="screen active" style="padding:24px;max-width:1200px;margin:0 auto;">
+        <header class="app-header" style="margin-bottom:24px;">
+            <div class="header-logo">
+                <div class="header-icon" style="background:var(--green-accent);color:#000;">
+                    👤
+                </div>
+                <span class="header-title">MedAI</span>
+                <span class="header-divider">|</span>
+                <span class="header-subtitle" style="color:var(--green-accent);">Patient Self-Service Account Portal</span>
+            </div>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-outline-sm" onclick="window.location.href='index.html'">← Home Portals</button>
+                <button class="btn btn-outline-sm" onclick="logoutUser()" style="border-color:rgba(255,75,75,0.4);color:var(--red-alert);">🚪 Logout</button>
+            </div>
+        </header>
+
+        <div style="display:grid;grid-template-columns:1fr 2fr;gap:20px;">
+            <!-- Patient Profile & Allergies Card -->
+            <div class="report-card">
+                <div class="report-card-header">
+                    <span>👤 My Patient Account Profile</span>
+                </div>
+                <div id="patient-portal-profile" style="font-size:0.88rem;line-height:1.6;color:var(--text-secondary);">
+                    Loading patient profile...
+                </div>
+            </div>
+
+            <!-- Medical History & Active Prescriptions -->
+            <div class="report-card">
+                <div class="report-card-header">
+                    <span>💊 Active Prescriptions &amp; Clinical History</span>
+                </div>
+                <div id="patient-portal-history" style="font-size:0.88rem;line-height:1.6;color:var(--text-secondary);">
+                    Loading medical history...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js?v=32"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            loadPatientPortalView("pat-001");
+        });
+    </script>
+</body>
+</html>
