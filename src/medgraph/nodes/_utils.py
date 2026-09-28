@@ -176,6 +176,18 @@ def parse_llm_json(raw: str, model: type[T], node_name: str) -> T:
                 data = {"findings": data}
             elif node_name == "case_builder":
                 data = {"key_findings": data}
+            elif node_name == "triage":
+                if data and isinstance(data[0], dict):
+                    data = data[0]
+                else:
+                    data = {"suspected_domains": [str(x) for x in data]}
+            elif node_name == "questioner":
+                if data and isinstance(data[0], str):
+                    data = {"questions_to_ask": data}
+                elif data and isinstance(data[0], dict):
+                    data = {"questions_to_ask": [d.get("question") or d.get("text") or str(d) for d in data]}
+                else:
+                    data = {"questions_to_ask": []}
         elif isinstance(data, dict):
             if node_name == "case_builder":
                 if isinstance(data.get("clinical_correlations"), list):
@@ -183,6 +195,8 @@ def parse_llm_json(raw: str, model: type[T], node_name: str) -> T:
                 if isinstance(data.get("case_summary"), list):
                     data["case_summary"] = " ".join(str(x) for x in data["case_summary"])
             elif node_name == "questioner":
+                if "questions" in data and "questions_to_ask" not in data:
+                    data["questions_to_ask"] = data["questions"]
                 if isinstance(data.get("information_gap"), list):
                     data["information_gap"] = ", ".join(str(x) for x in data["information_gap"])
                 if isinstance(data.get("recommended_tests"), dict):
