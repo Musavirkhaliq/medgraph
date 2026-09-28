@@ -4,6 +4,7 @@ Handles Supabase Auth, Doctor/Patient Role-Based Access, and Session Tokens.
 """
 
 import logging
+import secrets
 import uuid
 
 from medgraph.db.client import get_db_client
@@ -52,7 +53,7 @@ async def login_user(email: str, password: str) -> tuple[UserProfile | None, str
     # 1. Check local seed accounts first (for immediate admin / doctor / patient dev login)
     if email_clean in _local_users_db:
         user_info = _local_users_db[email_clean]
-        if user_info["password"] == password:
+        if secrets.compare_digest(user_info["password"], password):
             profile = UserProfile(
                 id=user_info["id"],
                 email=user_info["email"],
@@ -66,10 +67,16 @@ async def login_user(email: str, password: str) -> tuple[UserProfile | None, str
             return profile, fake_token
         return None, "Invalid password."
 
-    # 2. Check live Supabase user_profiles table if configured
+    # 2. Check live Supabase Auth if configured — this verifies the password via
+    #    Supabase's own GoTrue service; a matching email alone is never sufficient.
     if client.is_configured:
         try:
-            profiles = await client.rest_request("GET", "user_profiles", params={"email": f"eq.{email_clean}"})
+            auth_result = await client.sign_in_with_password(email_clean, password)
+            if not auth_result or not auth_result.get("access_token"):
+                return None, "Invalid email or password."
+
+            user_id = auth_result.get("user", {}).get("id")
+            profiles = await client.rest_request("GET", "user_profiles", params={"id": f"eq.{user_id}"})
             if profiles and len(profiles) > 0:
                 p = profiles[0]
                 profile = UserProfile(
@@ -81,10 +88,9 @@ async def login_user(email: str, password: str) -> tuple[UserProfile | None, str
                     specialty=p.get("specialty"),
                     department=p.get("department"),
                 )
-                fake_token = f"medai_token_{p['id']}"
-                return profile, fake_token
+                return profile, auth_result["access_token"]
         except Exception as exc:
-            logger.error("[Auth] Live Supabase profile lookup failed: %s", exc)
+            logger.error("[Auth] Live Supabase sign-in failed: %s", exc)
 
     return None, "User account not found. Please check your credentials or register an account."
 

@@ -38,6 +38,7 @@ export default function ConsultationWorkspace({
   symptoms,
   differential,
   primaryDiagnosis,
+  medications,
   onOpenAgentTelemetry,
   onOpenFinalReport,
   onToggleManualTests,

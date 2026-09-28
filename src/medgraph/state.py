@@ -150,7 +150,10 @@ class MedicalState(TypedDict, total=False):
 
     # ── Safety validation ────────────────────────────────────────────────────
     is_safe: bool
-    validation_warnings: Annotated[list[ValidationWarning], operator.add]
+    # Not append-only: each validator pass re-evaluates the current treatment
+    # plan from scratch, so this must be a fresh replacement each time rather
+    # than accumulating stale warnings from earlier, now-revised retries.
+    validation_warnings: list[ValidationWarning]
     validation_recommendations: list[str]
 
     # ── Memory IDs (set by appointment_memory_node after session completes) ───────────

@@ -64,6 +64,34 @@ class SupabaseDatabaseClient:
         except Exception:
             pass
 
+    async def sign_in_with_password(self, email: str, password: str) -> dict[str, Any] | None:
+        """Authenticate against Supabase's GoTrue Auth API (verifies the password).
+
+        Returns the auth response (access_token + user) on success, or None on
+        invalid credentials / failure. Callers must not treat a matching email
+        in user_profiles as sufficient proof of identity — the password has to
+        be checked here, against Supabase's own hashed credential store.
+        """
+        if not self.is_configured:
+            return None
+
+        url = f"{self.supabase_url.rstrip('/')}/auth/v1/token"
+        headers = {"apikey": self.supabase_key, "Content-Type": "application/json"}
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            try:
+                res = await client.post(
+                    url,
+                    headers=headers,
+                    params={"grant_type": "password"},
+                    json={"email": email, "password": password},
+                )
+                if res.status_code != 200:
+                    return None
+                return res.json()
+            except Exception as exc:
+                logger.error("[Supabase Auth] sign-in request failed: %s", exc)
+                return None
+
     async def rest_request(
         self,
         method: str,

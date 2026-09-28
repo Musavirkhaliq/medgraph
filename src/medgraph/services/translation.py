@@ -25,6 +25,7 @@ LANG_CODE_MAP: dict[str, str] = {
     "ar": "ar",
     "arabic": "ar",
     "zh": "zh-CN",
+    "zh-cn": "zh-CN",  # keeps normalize_lang_code idempotent (values are re-normalized downstream)
     "chinese": "zh-CN",
 }
 

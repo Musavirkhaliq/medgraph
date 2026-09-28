@@ -81,14 +81,28 @@ def _current_phase(state: MedicalState) -> str:
 
 
 def _completion_percentage(state: MedicalState) -> float:
-    """Estimate pipeline completion 0–100."""
-    phases = [
-        "demographics", "triage_level", "question_complete",
-        "case_summary", "investigations", "differential_diagnosis",
-        "medications", "is_safe",
-    ]
-    filled = sum(1 for p in phases if state.get(p))
-    return round(filled / len(phases) * 100, 1)
+    """Estimate pipeline completion 0–100, following the phase curve in the docs."""
+    if state.get("completed_at"):
+        return 100.0
+    if not state.get("triage_level"):
+        return 10.0
+    if not state.get("question_complete"):
+        from medgraph.config import get_settings
+
+        max_rounds = get_settings().max_question_rounds or 10
+        frac = min(state.get("question_round", 0) / max(max_rounds, 1), 1.0)
+        return round(20 + frac * 20, 1)
+    if not state.get("case_summary"):
+        return 50.0
+    if state.get("waiting_for_tests"):
+        return 60.0
+    if not state.get("primary_diagnosis"):
+        return 65.0 if state.get("image_analysis") else 60.0
+    if not state.get("medications") and not state.get("procedures"):
+        return 75.0
+    if state.get("is_safe") is None:
+        return 85.0
+    return 92.0
 
 
 async def _run_graph_in_background(session_id: str, state_update: dict | None = None):
@@ -105,6 +119,8 @@ async def _run_graph_in_background(session_id: str, state_update: dict | None = 
         current = _get_graph_state(session_id)
         if current.get("current_question"):
             _active_sessions[session_id]["status"] = "awaiting_answer"
+        elif current.get("waiting_for_tests"):
+            _active_sessions[session_id]["status"] = "awaiting_test_results"
         elif current.get("is_emergency") or current.get("completed_at"):
             _active_sessions[session_id]["status"] = "complete"
     except Exception as exc:

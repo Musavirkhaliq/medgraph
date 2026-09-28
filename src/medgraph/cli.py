@@ -277,6 +277,34 @@ async def _run_session(patient_input: str, session_id: str) -> None:
         # Wait for graph to finish
         await graph.ainvoke(None, config)
 
+    # ── Test-results interrupt loop ────────────────────────────────────────────
+    # investigator_node pauses the graph at "ask_for_test_results" whenever it
+    # recommends any investigation or imaging (almost every real case). Resume
+    # it the same way the API's /test_results endpoint does, or the pipeline
+    # never reaches diagnosis/treatment.
+    while graph.get_state(config).values.get("waiting_for_tests"):
+        console.print(
+            "[dim]The investigator requested test results before proceeding.[/dim]"
+        )
+        results_input = Prompt.ask(
+            "[dim]Enter test result notes (or press Enter to skip)[/dim]", default=""
+        )
+        update: dict = {"waiting_for_tests": False}
+        if results_input.strip():
+            current_state = graph.get_state(config).values
+            update["history"] = current_state.get("history", []) + [{
+                "type": "test_results",
+                "description": results_input.strip(),
+                "status": "received",
+                "since": "submitted with test results",
+            }]
+        await graph.aupdate_state(config, update)
+
+        with Progress(SpinnerColumn(), TextColumn("[cyan]Resuming pipeline …"), transient=True, console=console) as p:
+            t = p.add_task("", total=None)
+            await graph.ainvoke(None, config)
+            p.remove_task(t)
+
     # ── Render final report ───────────────────────────────────────────────────
     final_state = graph.get_state(config).values
     _print_report(final_state)

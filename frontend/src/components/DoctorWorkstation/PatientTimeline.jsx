@@ -46,8 +46,9 @@ export default function PatientTimeline({ patient }) {
       setIsLoading(true);
       try {
         const data = await getPatientMemoryTimeline(pid);
-        if (data && Array.isArray(data) && data.length > 0) {
-          const mapped = data.map(item => ({
+        const timeline = data?.timeline;
+        if (Array.isArray(timeline) && timeline.length > 0) {
+          const mapped = timeline.map(item => ({
             date: item.created_at ? new Date(item.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : "Recent",
             author: item.source === 'doctor' ? "Attending Physician" : "MedAI Memory Engine",
             type: item.category || (item.source === 'doctor' ? "Interim Chart Note" : "Episodic Summary"),

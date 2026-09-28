@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { SlidersHorizontal, X, Copy, Check, Bot, Sparkles, CheckCircle2 } from 'lucide-react';
 
 const AGENTS = [
@@ -15,6 +15,10 @@ const AGENTS = [
 export default function TelemetryModal({ isOpen, onClose, selectedAgentKey = 'intake_agent' }) {
   const [activeKey, setActiveKey] = useState(selectedAgentKey);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) setActiveKey(selectedAgentKey);
+  }, [isOpen, selectedAgentKey]);
 
   if (!isOpen) return null;
 
