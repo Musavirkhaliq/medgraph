@@ -82,6 +82,34 @@ class ValidationWarning(TypedDict):
     field: str | None
 
 
+class TranscriptSegment(TypedDict, total=False):
+    speaker: str | None     # doctor / patient / unknown
+    start: float
+    end: float
+    text: str
+
+
+class GuidelineChunk(TypedDict, total=False):
+    condition: str
+    chunk_text: str
+    source_citation: str
+    score: float | None
+
+
+class VitalsReading(TypedDict, total=False):
+    recorded_at: str
+    heart_rate: int | None
+    resp_rate: int | None
+    systolic_bp: int | None
+    diastolic_bp: int | None
+    temperature_c: float | None
+    spo2: int | None
+    o2_supplemental: bool
+    consciousness_level: str   # alert / voice / pain / unresponsive
+    news2_score: int | None
+    news2_risk_band: str | None
+
+
 class MedicalState(TypedDict, total=False):
     """
     Complete state passed through every node in the medical reasoning graph.
@@ -139,6 +167,7 @@ class MedicalState(TypedDict, total=False):
     differential_diagnosis: list[DiagnosisEntry]
     primary_diagnosis: str | None
     diagnosis_confidence: float               # 0.0 – 1.0
+    diagnosis_citations: list[str]            # guideline source_citation strings, if grounded
 
     # ── Treatment ────────────────────────────────────────────────────────────
     medications: list[MedicationEntry]
@@ -147,6 +176,7 @@ class MedicalState(TypedDict, total=False):
     follow_up: str
     monitoring: list[str]
     treatment_retry_count: int                 # tracks validation retries
+    treatment_citations: list[str]             # guideline source_citation strings, if grounded
 
     # ── Safety validation ────────────────────────────────────────────────────
     is_safe: bool
@@ -165,6 +195,28 @@ class MedicalState(TypedDict, total=False):
     patient_id: str | None          # patient UUID for memory association
     local_memory_id: str | None     # Supabase ID of stored local patient memory
     global_memory_id: str | None    # Supabase ID of stored global agent memory
+
+    # ── Ambient scribe (populated by scribe endpoints, not a graph node) ───────
+    transcript_segments: Annotated[list[TranscriptSegment], operator.add]
+    scribe_note: dict[str, Any] | None   # {subjective, objective, assessment, plan, raw_transcript}
+
+    # ── EHR / FHIR (merged into patient_context by memory_recall_node) ─────────
+    ehr_synced: bool                     # True if FHIR data was successfully merged this session
+
+    # ── Guideline-grounded reasoning (set by guideline_retrieval_node) ─────────
+    retrieved_guidelines: list[GuidelineChunk]
+
+    # ── Longitudinal vitals / early warning (set by memory_recall_node) ────────
+    latest_vitals: VitalsReading | None
+    news2_score: int | None
+    news2_risk_band: str | None          # low / medium / high
+
+    # ── Doctor review & sign-off (advisory; set via POST /sessions/{id}/review) ─
+    review_status: str | None            # pending / approved / rejected
+    reviewer_id: str | None
+    review_notes: str | None
+    reviewed_at: str | None
+    doctor_edits: dict[str, Any] | None   # doctor-edited overrides merged into the final report
 
     # ── Error handling ───────────────────────────────────────────────────────
     error: str | None
@@ -213,12 +265,14 @@ def initial_state(session_id: str, patient_input: str) -> MedicalState:
         differential_diagnosis=[],
         primary_diagnosis=None,
         diagnosis_confidence=0.0,
+        diagnosis_citations=[],
         medications=[],
         procedures=[],
         lifestyle_modifications=[],
         follow_up="",
         monitoring=[],
         treatment_retry_count=0,
+        treatment_citations=[],
         is_safe=False,
         validation_warnings=[],
         validation_recommendations=[],
@@ -230,4 +284,16 @@ def initial_state(session_id: str, patient_input: str) -> MedicalState:
         patient_id=None,
         local_memory_id=None,
         global_memory_id=None,
+        transcript_segments=[],
+        scribe_note=None,
+        ehr_synced=False,
+        retrieved_guidelines=[],
+        latest_vitals=None,
+        news2_score=None,
+        news2_risk_band=None,
+        review_status=None,
+        reviewer_id=None,
+        review_notes=None,
+        reviewed_at=None,
+        doctor_edits=None,
     )

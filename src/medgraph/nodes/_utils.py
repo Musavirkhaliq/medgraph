@@ -257,6 +257,22 @@ def build_context_prompt(state: Mapping[str, Any], extra: str = "") -> str:
             + json.dumps(agent_knowledge, indent=2)
         )
 
+    latest_vitals = state.get("latest_vitals")
+    if latest_vitals:
+        vitals_line = f"=== LATEST VITALS ===\n{json.dumps(latest_vitals, indent=2)}"
+        news2_score = state.get("news2_score")
+        if news2_score is not None:
+            vitals_line += f"\nNEWS2 score: {news2_score} ({state.get('news2_risk_band')} risk)"
+        parts.append(vitals_line)
+
+    retrieved_guidelines = state.get("retrieved_guidelines")
+    if retrieved_guidelines:
+        guideline_text = "\n\n".join(
+            f"[{g.get('condition')}] {g.get('chunk_text')}\n(source_citation: {g.get('source_citation')})"
+            for g in retrieved_guidelines
+        )
+        parts.append(f"=== RELEVANT CLINICAL GUIDELINES ===\n{guideline_text}")
+
     triage_level = state.get("triage_level")
     if triage_level:
         parts.append(

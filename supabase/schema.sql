@@ -278,3 +278,89 @@ CREATE POLICY "Patients view own appointment summaries" ON public.appointment_su
     FOR SELECT USING (
         patient_id IN (SELECT id FROM public.patients WHERE account_id = auth.uid())
     );
+
+-- ============================================================================
+-- FEATURE ADDITIONS: guideline RAG corpus, longitudinal vitals/NEWS2,
+-- and doctor review/sign-off status tracking.
+-- ============================================================================
+
+-- Doctor review & sign-off (advisory) — sessions.status already had room for
+-- this per its original comment enum; the CHECK below is dropped/recreated so
+-- the column keeps accepting the review-related values without a full migration.
+ALTER TABLE public.sessions
+    ADD COLUMN IF NOT EXISTS reviewer_id UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
+    ADD COLUMN IF NOT EXISTS review_notes TEXT,
+    ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMPTZ;
+-- status now additionally takes: pending_review, approved, rejected (alongside
+-- the original running, awaiting_answer, complete, emergency, error)
+
+-- 9. Guideline RAG Corpus
+CREATE TABLE IF NOT EXISTS public.guideline_chunks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    condition VARCHAR(255) NOT NULL,
+    chunk_text TEXT NOT NULL,
+    source_citation VARCHAR(255) NOT NULL,
+    embedding VECTOR(1536),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS guideline_chunks_vector_idx
+ON public.guideline_chunks USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
+
+CREATE OR REPLACE FUNCTION match_guideline_chunks(
+    query_embedding VECTOR(1536),
+    match_count INT DEFAULT 5
+)
+RETURNS SETOF public.guideline_chunks
+LANGUAGE sql STABLE
+AS $$
+    SELECT *
+    FROM public.guideline_chunks
+    WHERE embedding IS NOT NULL
+    ORDER BY embedding <=> query_embedding
+    LIMIT match_count;
+$$;
+
+ALTER TABLE public.guideline_chunks ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Authenticated users read guideline corpus" ON public.guideline_chunks
+    FOR SELECT USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Doctors manage guideline corpus" ON public.guideline_chunks
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role IN ('doctor', 'admin'))
+    );
+
+-- 10. Longitudinal Vitals / NEWS2 Early Warning
+CREATE TABLE IF NOT EXISTS public.patient_vitals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID NOT NULL REFERENCES public.patients(id) ON DELETE CASCADE,
+    session_id VARCHAR(64) REFERENCES public.sessions(session_id) ON DELETE SET NULL,
+    recorded_at TIMESTAMPTZ DEFAULT NOW(),
+    heart_rate INT,
+    resp_rate INT,
+    systolic_bp INT,
+    diastolic_bp INT,
+    temperature_c FLOAT,
+    spo2 INT,
+    o2_supplemental BOOLEAN DEFAULT FALSE,
+    consciousness_level VARCHAR(32) DEFAULT 'alert', -- alert / voice / pain / unresponsive
+    recorded_by UUID REFERENCES public.user_profiles(id) ON DELETE SET NULL,
+    news2_score INT,
+    news2_risk_band VARCHAR(16) -- low / medium / high
+);
+
+CREATE INDEX IF NOT EXISTS idx_patient_vitals_patient_id ON public.patient_vitals(patient_id);
+CREATE INDEX IF NOT EXISTS idx_patient_vitals_recorded_at ON public.patient_vitals(recorded_at);
+
+ALTER TABLE public.patient_vitals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Patients view own vitals" ON public.patient_vitals
+    FOR SELECT USING (
+        patient_id IN (SELECT id FROM public.patients WHERE account_id = auth.uid())
+    );
+
+CREATE POLICY "Doctors manage vitals" ON public.patient_vitals
+    FOR ALL USING (
+        EXISTS (SELECT 1 FROM public.user_profiles WHERE id = auth.uid() AND role IN ('doctor', 'admin'))
+    );

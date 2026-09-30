@@ -35,6 +35,7 @@ class DiagnosisResult(BaseModel):
     primary_diagnosis: str | None = None
     diagnosis_confidence: float = 0.0
     reasoning: str = ""
+    citations: list[str] = Field(default_factory=list)
 
 
 # ── Node function ─────────────────────────────────────────────────────────────
@@ -85,6 +86,7 @@ def diagnostician_node(state: MedicalState) -> dict:
             ],
             "primary_diagnosis": result.primary_diagnosis,
             "diagnosis_confidence": result.diagnosis_confidence,
+            "diagnosis_citations": result.citations,
         }
 
     except Exception as exc:
@@ -93,5 +95,6 @@ def diagnostician_node(state: MedicalState) -> dict:
             "differential_diagnosis": [],
             "primary_diagnosis": None,
             "diagnosis_confidence": 0.0,
+            "diagnosis_citations": [],
             "node_errors": [f"diagnostician: {exc}"],
         }

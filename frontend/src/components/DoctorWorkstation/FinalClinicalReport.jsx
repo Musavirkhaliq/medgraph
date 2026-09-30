@@ -1,20 +1,24 @@
-import React from 'react';
-import { 
-  Printer, 
-  RotateCcw, 
-  ShieldCheck, 
-  CheckCircle2, 
-  FileText, 
-  Pill, 
-  Calendar, 
-  User, 
-  Stethoscope 
+import React, { useState } from 'react';
+import {
+  Printer,
+  RotateCcw,
+  ShieldCheck,
+  CheckCircle2,
+  XCircle,
+  Pencil,
+  Save,
+  BookOpen,
+  Database,
+  HeartPulse,
 } from 'lucide-react';
+import { submitReportReview } from '../../services/api';
 
-export default function FinalClinicalReport({ 
-  patient, 
-  reportData, 
-  onNewConsultation 
+export default function FinalClinicalReport({
+  patient,
+  reportData,
+  sessionId,
+  reviewerId = 'doc-001',
+  onNewConsultation
 }) {
   const printReport = () => {
     window.print();
@@ -40,9 +44,76 @@ export default function FinalClinicalReport({
     follow_up: "Outpatient follow-up with pulmonology clinic in 7–10 days. Return to emergency room immediately if severe shortness of breath or cyanosis occurs."
   };
 
+  // ── Doctor review & sign-off (advisory) ─────────────────────────────────────
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedDiagnosis, setEditedDiagnosis] = useState(safeReport.primary_diagnosis || '');
+  const [editedFollowUp, setEditedFollowUp] = useState(safeReport.follow_up || '');
+  const [editedLifestyle, setEditedLifestyle] = useState(safeReport.lifestyle || '');
+  const [reviewStatus, setReviewStatus] = useState(reportData?.review_status || null);
+  const [reviewNotes, setReviewNotes] = useState(reportData?.review_notes || '');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
+
+  const submitReview = async (status) => {
+    if (!sessionId) {
+      setReviewStatus(status);
+      return;
+    }
+    setIsSubmittingReview(true);
+    setReviewError(null);
+    try {
+      const editedReport = isEditing
+        ? {
+            primary_diagnosis: editedDiagnosis,
+            follow_up: editedFollowUp,
+            lifestyle_modifications: editedLifestyle ? editedLifestyle.split('\n').filter(Boolean) : undefined,
+          }
+        : null;
+      await submitReportReview(sessionId, {
+        status,
+        reviewerId,
+        notes: reviewNotes || null,
+        editedReport,
+      });
+      setReviewStatus(status);
+      setIsEditing(false);
+    } catch (err) {
+      setReviewError(err.message || 'Failed to submit review.');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  };
+
+  const diagnosisCitations = reportData?.diagnosis_citations || [];
+  const treatmentCitations = reportData?.treatment_citations || [];
+  const allCitations = [...new Set([...diagnosisCitations, ...treatmentCitations])];
+
+  // Tailwind needs statically-analyzable class strings — build them per-status
+  // rather than interpolating a color name, so the JIT compiler can find them.
+  const reviewBanner = {
+    approved: {
+      icon: CheckCircle2,
+      label: 'Approved by reviewing physician',
+      wrapClass: 'bg-teal-500/10 border-teal-500/20',
+      textClass: 'text-teal-300',
+    },
+    rejected: {
+      icon: XCircle,
+      label: 'Rejected — changes requested',
+      wrapClass: 'bg-rose-500/10 border-rose-500/20',
+      textClass: 'text-rose-300',
+    },
+    pending: {
+      icon: ShieldCheck,
+      label: 'Pending doctor review',
+      wrapClass: 'bg-amber-500/10 border-amber-500/20',
+      textClass: 'text-amber-300',
+    },
+  }[reviewStatus || 'pending'];
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-      
+
       {/* Top Action Bar (hidden when printed) */}
       <div className="print:hidden flex items-center justify-between gap-4 p-4 rounded-2xl bg-slate-900/80 border border-white/10">
         <div className="flex items-center gap-2">
@@ -74,9 +145,90 @@ export default function FinalClinicalReport({
         </div>
       </div>
 
+      {/* Doctor Review & Sign-off (advisory — report above is already final/visible) */}
+      <div className={`print:hidden p-4 rounded-2xl border space-y-3 ${reviewBanner.wrapClass}`}>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className={`flex items-center gap-2 text-xs font-bold ${reviewBanner.textClass}`}>
+            <reviewBanner.icon className="w-4 h-4" />
+            {reviewBanner.label}
+            {reportData?.reviewed_at && (
+              <span className="font-normal text-slate-400">
+                &bull; {new Date(reportData.reviewed_at).toLocaleString()}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsEditing((v) => !v)}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-semibold transition-colors"
+            >
+              <Pencil className="w-3.5 h-3.5" />
+              {isEditing ? 'Cancel Edit' : 'Edit Before Sign-off'}
+            </button>
+            <button
+              disabled={isSubmittingReview}
+              onClick={() => submitReview('approved')}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 text-[11px] font-bold transition-colors disabled:opacity-50"
+            >
+              <CheckCircle2 className="w-3.5 h-3.5" />
+              {isEditing ? 'Save & Approve' : 'Approve & Sign'}
+            </button>
+            <button
+              disabled={isSubmittingReview}
+              onClick={() => submitReview('rejected')}
+              className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 text-[11px] font-bold transition-colors disabled:opacity-50"
+            >
+              <XCircle className="w-3.5 h-3.5" />
+              Request Changes
+            </button>
+          </div>
+        </div>
+
+        {isEditing && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-slate-400 font-semibold">Primary Diagnosis</label>
+              <input
+                value={editedDiagnosis}
+                onChange={(e) => setEditedDiagnosis(e.target.value)}
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-slate-400 font-semibold">Follow-up Plan</label>
+              <textarea
+                value={editedFollowUp}
+                onChange={(e) => setEditedFollowUp(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-slate-400 font-semibold">Lifestyle Modifications (one per line)</label>
+              <textarea
+                value={editedLifestyle}
+                onChange={(e) => setEditedLifestyle(e.target.value)}
+                rows={2}
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+            <div className="space-y-1 sm:col-span-2">
+              <label className="text-slate-400 font-semibold">Review Notes</label>
+              <input
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+                placeholder="Optional notes for the record…"
+                className="w-full px-3 py-2 rounded-lg bg-slate-950 border border-white/10 text-white focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+          </div>
+        )}
+        {reviewError && <div className="text-rose-400 text-[11px]">{reviewError}</div>}
+      </div>
+
       {/* Printable Clinical Report Document Container */}
       <div className="p-8 rounded-2xl bg-slate-900 border border-white/10 space-y-6 print:bg-white print:text-black print:border-none print:p-0">
-        
+
         {/* Hospital / Clinic Header */}
         <div className="flex items-start justify-between border-b border-white/10 pb-6 print:border-black">
           <div className="space-y-1">
@@ -119,6 +271,28 @@ export default function FinalClinicalReport({
           </div>
         </div>
 
+        {/* EHR sync + NEWS2 early-warning strip (only shown when data is present) */}
+        {(reportData?.ehr_synced || reportData?.news2_score != null) && (
+          <div className="flex flex-wrap items-center gap-3 text-xs">
+            {reportData?.ehr_synced && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300 print:hidden">
+                <Database className="w-3.5 h-3.5" />
+                <span>Synced with patient EHR record</span>
+              </div>
+            )}
+            {reportData?.news2_score != null && (
+              <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border print:hidden ${
+                reportData.news2_risk_band === 'high' ? 'bg-rose-500/10 border-rose-500/20 text-rose-300'
+                : reportData.news2_risk_band === 'medium' ? 'bg-amber-500/10 border-amber-500/20 text-amber-300'
+                : 'bg-teal-500/10 border-teal-500/20 text-teal-300'
+              }`}>
+                <HeartPulse className="w-3.5 h-3.5" />
+                <span>NEWS2 Score: {reportData.news2_score} ({reportData.news2_risk_band} risk)</span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Safety Clearance Banner */}
         <div className="p-4 rounded-xl bg-teal-500/10 border border-teal-500/20 print:bg-gray-50 print:border-gray-400 flex items-center gap-3">
           <ShieldCheck className="w-5 h-5 text-teal-400 print:text-black shrink-0" />
@@ -138,7 +312,7 @@ export default function FinalClinicalReport({
             </span>
           </div>
           <div className="text-lg font-bold text-white print:text-black">
-            {safeReport.primary_diagnosis}
+            {reportData?.doctor_edits?.primary_diagnosis || safeReport.primary_diagnosis}
           </div>
           <div className="text-xs text-slate-400 print:text-gray-700">
             Triage Severity: <strong className="text-slate-200 print:text-black">{safeReport.triage_level}</strong>
@@ -190,15 +364,34 @@ export default function FinalClinicalReport({
           </div>
         </div>
 
+        {/* Guideline sources (RAG-grounded reasoning citations) */}
+        {allCitations.length > 0 && (
+          <div className="space-y-2">
+            <h4 className="text-xs font-mono uppercase text-slate-400 print:text-black font-semibold flex items-center gap-1.5">
+              <BookOpen className="w-3.5 h-3.5" />
+              Guideline Sources
+            </h4>
+            <ul className="text-[11px] text-slate-400 print:text-gray-700 space-y-1 list-disc list-inside">
+              {allCitations.map((c, idx) => (
+                <li key={idx}>{c}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Lifestyle & Follow-up */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
           <div className="p-4 rounded-xl bg-slate-950/60 border border-white/5 print:bg-gray-50 print:border-gray-300 space-y-1">
             <span className="font-bold text-slate-300 print:text-black block">Lifestyle &amp; Non-Pharmacological</span>
-            <p className="text-slate-400 print:text-gray-700 leading-relaxed">{safeReport.lifestyle}</p>
+            <p className="text-slate-400 print:text-gray-700 leading-relaxed">
+              {(reportData?.doctor_edits?.lifestyle_modifications || []).join(' ') || safeReport.lifestyle}
+            </p>
           </div>
           <div className="p-4 rounded-xl bg-slate-950/60 border border-white/5 print:bg-gray-50 print:border-gray-300 space-y-1">
             <span className="font-bold text-slate-300 print:text-black block">Follow-up &amp; Red Flag Instructions</span>
-            <p className="text-slate-400 print:text-gray-700 leading-relaxed">{safeReport.follow_up}</p>
+            <p className="text-slate-400 print:text-gray-700 leading-relaxed">
+              {reportData?.doctor_edits?.follow_up || safeReport.follow_up}
+            </p>
           </div>
         </div>
 
@@ -209,7 +402,9 @@ export default function FinalClinicalReport({
             <div className="text-slate-400 print:text-gray-600 text-[11px]">Attending Physician, Pulmonology &amp; Internal Medicine</div>
           </div>
           <div className="text-right text-[11px] text-teal-400 print:text-black font-semibold">
-            ✓ Digitally Verified &amp; Signed via MedAI Consensus Graph
+            {reviewStatus === 'approved'
+              ? '✓ Reviewed, Digitally Verified & Signed via MedAI Consensus Graph'
+              : '⏳ Awaiting physician review & sign-off'}
           </div>
         </div>
 

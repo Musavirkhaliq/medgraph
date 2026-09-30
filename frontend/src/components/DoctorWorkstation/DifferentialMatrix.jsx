@@ -1,18 +1,20 @@
 import React from 'react';
-import { 
-  Network, 
-  CheckCircle2, 
-  AlertCircle, 
-  HelpCircle, 
-  TrendingUp, 
-  Sparkles, 
-  FileText 
+import {
+  Network,
+  CheckCircle2,
+  AlertCircle,
+  HelpCircle,
+  TrendingUp,
+  Sparkles,
+  FileText,
+  BookOpen
 } from 'lucide-react';
 
-export default function DifferentialMatrix({ 
-  primaryDiagnosis, 
-  differential = [], 
-  confidence = 90 
+export default function DifferentialMatrix({
+  primaryDiagnosis,
+  differential = [],
+  confidence = 90,
+  citations = []
 }) {
   const defaultDiffs = differential.length > 0 ? differential : [
     {
@@ -129,6 +131,21 @@ export default function DifferentialMatrix({
               ))}
             </div>
           </div>
+
+          {/* Guideline sources (RAG-grounded reasoning citations) */}
+          {citations.length > 0 && (
+            <div className="p-4 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2">
+              <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5 text-cyan-400" />
+                Guideline Sources
+              </h4>
+              <ul className="text-[11px] text-slate-400 space-y-1 list-disc list-inside">
+                {citations.map((c, idx) => (
+                  <li key={idx}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
 
         {/* Medical Knowledge Graph SVG Visualization */}

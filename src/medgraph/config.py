@@ -26,7 +26,7 @@ class Settings(BaseSettings):
     medgemma_model: str = "medgemma1.5"
     openai_api_key: str = ""
     openai_fallback_model: str = "gpt-4o-mini"
-    llm_provider: Literal["auto", "ollama", "openai"] = "auto"
+    llm_provider: Literal["auto", "ollama", "openai", "mock"] = "auto"
 
     # ── Embeddings (optional — semantic memory retrieval) ───────────────────
     embedding_provider: Literal["auto", "ollama", "openai", "none"] = "auto"
@@ -54,6 +54,17 @@ class Settings(BaseSettings):
     # ── Storage ───────────────────────────────────────────────────────────────
     checkpoint_db_path: str = ""
     reports_dir: Path = Path("reports")
+
+    # ── EHR / FHIR Integration ───────────────────────────────────────────────
+    fhir_server_url: str = ""              # if set, FHIRClient hits a real FHIR R4 server
+    fhir_mock_dir: Path = Path("data/fhir_mock")  # local FHIR Bundle fixtures used otherwise
+
+    # ── Guideline RAG ────────────────────────────────────────────────────────
+    guideline_corpus_dir: Path = Path("data/guidelines")
+    guideline_top_k: int = 3
+
+    # ── Early Warning (NEWS2) ────────────────────────────────────────────────
+    news2_alert_threshold: int = 7
 
     # ── Logging ───────────────────────────────────────────────────────────────
     log_level: str = "INFO"

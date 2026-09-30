@@ -57,6 +57,22 @@ async def lifespan(app: FastAPI):
     # Ensure reports directory exists
     settings.reports_dir.mkdir(parents=True, exist_ok=True)
 
+    # Auto-seed the guideline RAG corpus when running on the in-memory
+    # fallback (no Supabase configured) — that store is per-process, so
+    # without this the corpus would silently stay empty for this server
+    # unless someone had already run `medgraph ingest-guidelines` in the
+    # exact same process. With Supabase configured, ingestion is a one-time
+    # `medgraph ingest-guidelines` operation (repeating it here would insert
+    # duplicate rows on every restart).
+    from medgraph.db.client import get_db_client
+    if not get_db_client().is_configured:
+        from medgraph.services.guideline_store import ingest_guidelines
+        try:
+            count = await ingest_guidelines()
+            logger.info("Auto-ingested %d guideline chunk(s) into in-memory store.", count)
+        except Exception as exc:
+            logger.warning("Guideline corpus auto-ingestion failed: %s", exc)
+
     logger.info("MedGraph API ready ✓")
     yield
     logger.info("MedGraph API shut down.")

@@ -26,12 +26,15 @@ from medgraph.api.models import (
     FinalReport,
     HealthResponse,
     QuestionResponse,
+    ReviewSubmitRequest,
+    ScribeGenerateRequest,
     SessionStartResponse,
     SessionStateResponse,
     StartSessionRequest,
     TestResultsRequest,
     TranslateRequest,
     TranslateResponse,
+    VitalsSubmitRequest,
     VoiceStatusResponse,
     VoiceTranscribeResponse,
 )
@@ -377,6 +380,11 @@ async def get_session(session_id: str):
         is_safe=state.get("is_safe"),
         validation_warnings=state.get("validation_warnings", []),
         validation_recommendations=state.get("validation_recommendations", []),
+        diagnosis_citations=state.get("diagnosis_citations", []),
+        treatment_citations=state.get("treatment_citations", []),
+        ehr_synced=bool(state.get("ehr_synced")),
+        news2_score=state.get("news2_score"),
+        news2_risk_band=state.get("news2_risk_band"),
         agent_telemetry=agent_telemetry,
         memory_context=_build_memory_context(state),
         message=f"Phase: {_current_phase(state)}",
@@ -716,18 +724,25 @@ async def get_report(session_id: str):
                 detail="Assessment still in progress. Check session status.",
             )
 
+    # Doctor-edited overrides (advisory review, see POST /sessions/{id}/review)
+    # are merged over the AI-generated fields rather than replacing the report,
+    # so an approved-with-edits report reflects the doctor's corrections.
+    doctor_edits = state.get("doctor_edits") or {}
+
     return FinalReport(
         session_id=session_id,
         is_emergency=bool(state.get("is_emergency")),
         triage_level=state.get("triage_level", ""),
-        primary_diagnosis=state.get("primary_diagnosis"),
+        primary_diagnosis=doctor_edits.get("primary_diagnosis", state.get("primary_diagnosis")),
         differential_diagnosis=state.get("differential_diagnosis", []),
         diagnosis_confidence=state.get("diagnosis_confidence", 0.0),
-        medications=state.get("medications", []),
+        diagnosis_citations=state.get("diagnosis_citations", []),
+        medications=doctor_edits.get("medications", state.get("medications", [])),
         procedures=state.get("procedures", []),
-        lifestyle_modifications=state.get("lifestyle_modifications", []),
-        follow_up=state.get("follow_up", ""),
+        lifestyle_modifications=doctor_edits.get("lifestyle_modifications", state.get("lifestyle_modifications", [])),
+        follow_up=doctor_edits.get("follow_up", state.get("follow_up", "")),
         monitoring=state.get("monitoring", []),
+        treatment_citations=state.get("treatment_citations", []),
         is_safe=bool(state.get("is_safe")),
         validation_warnings=state.get("validation_warnings", []),
         validation_recommendations=state.get("validation_recommendations", []),
@@ -736,7 +751,72 @@ async def get_report(session_id: str):
         started_at=state.get("started_at"),
         completed_at=state.get("completed_at"),
         agent_telemetry=_build_agent_telemetry(state),
+        ehr_synced=bool(state.get("ehr_synced")),
+        news2_score=state.get("news2_score"),
+        news2_risk_band=state.get("news2_risk_band"),
+        review_status=state.get("review_status"),
+        reviewer_id=state.get("reviewer_id"),
+        review_notes=state.get("review_notes"),
+        reviewed_at=state.get("reviewed_at"),
+        doctor_edits=state.get("doctor_edits"),
     )
+
+
+@router.post("/sessions/{session_id}/review", tags=["Reports"])
+async def submit_report_review(session_id: str, body: ReviewSubmitRequest):
+    """
+    Doctor review & sign-off on a completed report (advisory — the report is
+    already visible via GET /report; this records approval/edits/rejection
+    alongside it rather than gating access to it).
+    """
+    from datetime import datetime, timezone
+
+    if body.status not in ("approved", "rejected"):
+        raise HTTPException(status_code=400, detail="status must be 'approved' or 'rejected'.")
+
+    state = _get_graph_state(session_id)
+    if not state and session_id not in _active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    graph = get_compiled_graph()
+    reviewed_at = datetime.now(timezone.utc).isoformat()
+    await graph.aupdate_state(
+        _thread_config(session_id),
+        {
+            "review_status": body.status,
+            "reviewer_id": body.reviewer_id,
+            "review_notes": body.notes,
+            "reviewed_at": reviewed_at,
+            "doctor_edits": body.edited_report,
+        },
+    )
+
+    # Best-effort persist to Supabase sessions.status — never blocks the response.
+    try:
+        from medgraph.db.client import get_db_client, to_uuid_safe
+
+        db_client = get_db_client()
+        if db_client.is_configured:
+            await db_client.rest_request(
+                "PATCH", "sessions",
+                params={"session_id": f"eq.{session_id}"},
+                json_data={
+                    "status": body.status,
+                    "reviewer_id": to_uuid_safe(body.reviewer_id) if body.reviewer_id else None,
+                    "review_notes": body.notes,
+                    "reviewed_at": reviewed_at,
+                },
+            )
+    except Exception as exc:
+        logger.warning("[API] Failed to persist review status to Supabase: %s", exc)
+
+    return {
+        "session_id": session_id,
+        "review_status": body.status,
+        "reviewer_id": body.reviewer_id,
+        "review_notes": body.notes,
+        "reviewed_at": reviewed_at,
+    }
 
 
 @router.delete("/sessions/{session_id}", tags=["Sessions"])
@@ -744,6 +824,87 @@ async def delete_session(session_id: str):
     """End and clean up a session."""
     _active_sessions.pop(session_id, None)
     return {"session_id": session_id, "status": "deleted"}
+
+
+# ── Ambient Clinical Scribe ─────────────────────────────────────────────────
+# Recording happens out-of-band during the consult (independent of pipeline
+# phase), reusing the existing faster-whisper transcription already exposed
+# at POST /api/v1/voice/transcribe — these endpoints just accumulate segments
+# into session state and, on request, turn them into a SOAP note.
+
+@router.post("/sessions/{session_id}/scribe/audio", tags=["Scribe"])
+async def scribe_upload_audio(session_id: str, file: UploadFile = File(...)):
+    """Transcribe an audio chunk and append it to this session's running transcript."""
+    if session_id not in _active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    import asyncio
+
+    from medgraph.services.voice import transcribe_audio
+
+    audio_bytes = await file.read()
+    if not audio_bytes:
+        raise HTTPException(status_code=400, detail="Uploaded audio chunk is empty.")
+
+    result = await asyncio.to_thread(
+        transcribe_audio, audio_bytes=audio_bytes, filename=file.filename or "chunk.webm",
+    )
+
+    new_segments = [
+        {"speaker": None, "start": s.get("start", 0.0), "end": s.get("end", 0.0), "text": s.get("text", "")}
+        for s in result.get("segments", [])
+    ] or [{"speaker": None, "start": 0.0, "end": result.get("duration", 0.0), "text": result.get("text", "")}]
+
+    graph = get_compiled_graph()
+    # transcript_segments uses operator.add reducer — append-only, no read-before-write needed
+    await graph.aupdate_state(_thread_config(session_id), {"transcript_segments": new_segments})
+
+    return {"session_id": session_id, "status": "ok", "segments_added": len(new_segments), "text": result.get("text", "")}
+
+
+@router.get("/sessions/{session_id}/scribe", tags=["Scribe"])
+async def scribe_get(session_id: str):
+    """Retrieve the accumulated transcript and generated SOAP note (if any) for a session."""
+    state = _get_graph_state(session_id)
+    if not state and session_id not in _active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    return {
+        "session_id": session_id,
+        "transcript_segments": state.get("transcript_segments", []),
+        "scribe_note": state.get("scribe_note"),
+    }
+
+
+@router.post("/sessions/{session_id}/scribe/generate", tags=["Scribe"])
+async def scribe_generate(session_id: str, body: ScribeGenerateRequest):
+    """Generate a structured SOAP note from the session's accumulated transcript."""
+    import asyncio
+
+    from medgraph.nodes._utils import build_context_prompt
+    from medgraph.services.scribe import generate_soap_note
+
+    state = _get_graph_state(session_id)
+    if not state and session_id not in _active_sessions:
+        raise HTTPException(status_code=404, detail="Session not found.")
+
+    segments = state.get("transcript_segments", [])
+    transcript_text = "\n".join(s.get("text", "") for s in segments if s.get("text"))
+    if body.additional_notes:
+        transcript_text += f"\n[Doctor note] {body.additional_notes}"
+
+    context = build_context_prompt(state)
+    result = await asyncio.get_running_loop().run_in_executor(
+        None, generate_soap_note, transcript_text, context,
+    )
+
+    scribe_note = result.model_dump()
+    scribe_note["raw_transcript"] = transcript_text
+
+    graph = get_compiled_graph()
+    await graph.aupdate_state(_thread_config(session_id), {"scribe_note": scribe_note})
+
+    return {"session_id": session_id, "status": "ok", "scribe_note": scribe_note}
 
 
 @router.get("/health", response_model=HealthResponse, tags=["System"])
@@ -754,12 +915,14 @@ async def health():
     from medgraph.llm import _ollama_available
 
     settings = get_settings()
-    provider = (
-        "ollama"
-        if (settings.llm_provider == "auto" and _ollama_available())
-        or settings.llm_provider == "ollama"
-        else "openai"
-    )
+    if settings.llm_provider == "mock":
+        provider = "mock"
+    elif settings.llm_provider == "ollama" or (settings.llm_provider == "auto" and _ollama_available()):
+        provider = "ollama"
+    elif settings.llm_provider == "openai" or (settings.llm_provider == "auto" and settings.openai_api_key):
+        provider = "openai"
+    else:
+        provider = "mock"  # auto mode with no provider configured — see llm.get_llm()
 
     return HealthResponse(
         status="healthy",
@@ -981,6 +1144,62 @@ async def api_patient_history(patient_id: str):
         "local_memories": [m.model_dump() for m in local_mems],
         "followups": [f.model_dump() for f in followups],
     }
+
+
+@router.get("/patients/{patient_id}/ehr", tags=["Patients"])
+async def api_patient_ehr(patient_id: str):
+    """
+    Retrieve a patient's external EHR record (allergies, medications,
+    conditions) via the FHIR client — mock fixture by default, or a live FHIR
+    server if ``fhir_server_url`` is configured.
+    """
+    from medgraph.ehr.client import get_fhir_client
+
+    bundle = await get_fhir_client().get_patient_bundle(patient_id)
+    if not bundle:
+        raise HTTPException(status_code=404, detail="No FHIR record found for this patient.")
+
+    return {"status": "ok", "source": "live" if get_fhir_client().is_live else "mock", "ehr": bundle.model_dump()}
+
+
+@router.post("/patients/{patient_id}/vitals", tags=["Vitals"])
+async def api_record_vitals(patient_id: str, body: VitalsSubmitRequest):
+    """Record a vitals reading, compute its NEWS2 deterioration score, and persist it."""
+    from medgraph.db.repository import record_vitals
+
+    reading = await record_vitals(patient_id, body.model_dump(), recorded_by=body.recorded_by)
+    cfg_threshold = 7
+    try:
+        from medgraph.config import get_settings
+        cfg_threshold = get_settings().news2_alert_threshold
+    except Exception:
+        pass
+
+    return {
+        "status": "ok",
+        "reading": reading,
+        "alert": reading["news2_risk_band"] == "high" or reading["news2_score"] >= cfg_threshold,
+    }
+
+
+@router.get("/patients/{patient_id}/vitals", tags=["Vitals"])
+async def api_list_vitals(patient_id: str, limit: int = 20):
+    """Retrieve recent vitals history for a patient (most recent first) for trend charting."""
+    from medgraph.db.repository import list_vitals
+
+    readings = await list_vitals(patient_id, limit=limit)
+    return {"patient_id": patient_id, "count": len(readings), "readings": readings}
+
+
+@router.get("/patients/{patient_id}/vitals/latest", tags=["Vitals"])
+async def api_latest_vitals(patient_id: str):
+    """Retrieve the most recent vitals reading + NEWS2 score for a patient."""
+    from medgraph.db.repository import get_latest_vitals
+
+    reading = await get_latest_vitals(patient_id)
+    if not reading:
+        raise HTTPException(status_code=404, detail="No vitals recorded for this patient.")
+    return {"status": "ok", "reading": reading}
 
 
 @router.post("/patients/{patient_id}/memory", tags=["Memory"])

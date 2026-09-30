@@ -45,6 +45,7 @@ class TreatmentResult(BaseModel):
     follow_up: str = ""
     monitoring: list[str] = Field(default_factory=list)
     patient_education: list[str] = Field(default_factory=list)
+    citations: list[str] = Field(default_factory=list)
 
 
 # ── Node function ─────────────────────────────────────────────────────────────
@@ -140,6 +141,7 @@ def treatment_node(state: MedicalState) -> dict:
             "lifestyle_modifications": lifestyles,
             "follow_up": follow,
             "monitoring": monit or ["Pulse oximetry", "Symptom tracking log"],
+            "treatment_citations": result.citations,
         }
 
     except Exception as exc:
@@ -152,5 +154,6 @@ def treatment_node(state: MedicalState) -> dict:
             "lifestyle_modifications": ["Rest and fluids", "Seek medical evaluation if symptoms worsen"],
             "follow_up": "Follow up with primary care clinician within 1 week.",
             "monitoring": ["Symptom progression"],
+            "treatment_citations": [],
             "node_errors": [f"treatment: {exc}"],
         }

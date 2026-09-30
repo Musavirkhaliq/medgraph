@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 TaskType = Literal[
     "intake", "triage", "questioning", "case_builder",
     "investigation", "interpretation", "diagnosis",
-    "treatment", "validation", "general",
+    "treatment", "validation", "scribe", "general",
 ]
 
 # Per-task LLM configuration
@@ -41,6 +41,7 @@ _TASK_CONFIGS: dict[TaskType, dict] = {
     "diagnosis":     {"temperature": 0.1, "num_predict": 4096},   # multiple differentials + evidence
     "treatment":     {"temperature": 0.1, "num_predict": 4096},   # medications & procedures
     "validation":    {"temperature": 0.0, "num_predict": 4096},   # deterministic safety checks
+    "scribe":        {"temperature": 0.1, "num_predict": 4096},   # SOAP note from transcript
     "general":       {"temperature": 0.1, "num_predict": 2048},
 }
 
@@ -98,6 +99,9 @@ def get_llm(task_type: TaskType = "general") -> BaseChatModel:
     """
     cfg = get_settings()
 
+    if cfg.llm_provider == "mock":
+        return _mock_model(task_type)
+
     use_ollama = (
         cfg.llm_provider == "ollama"
         or (cfg.llm_provider == "auto" and _ollama_available())
@@ -117,20 +121,31 @@ def get_llm(task_type: TaskType = "general") -> BaseChatModel:
         return model
 
     # ── OpenAI fallback ──────────────────────────────────────────────────────
-    if not cfg.openai_api_key:
-        raise RuntimeError(
-            "No LLM provider available.\n"
-            "  • Start Ollama with: ollama pull medgemma1.5 && ollama serve\n"
-            "  • Or set OPENAI_API_KEY in your .env file."
+    if cfg.openai_api_key:
+        from langchain_openai import ChatOpenAI
+
+        task_cfg = _OPENAI_TASK_CONFIGS.get(task_type, _OPENAI_TASK_CONFIGS["general"])
+        model = ChatOpenAI(
+            api_key=cfg.openai_api_key,
+            model=cfg.openai_fallback_model,
+            **task_cfg,
         )
+        logger.debug("LLM[%s] → OpenAI/%s", task_type, cfg.openai_fallback_model)
+        return model
 
-    from langchain_openai import ChatOpenAI
-
-    task_cfg = _OPENAI_TASK_CONFIGS.get(task_type, _OPENAI_TASK_CONFIGS["general"])
-    model = ChatOpenAI(
-        api_key=cfg.openai_api_key,
-        model=cfg.openai_fallback_model,
-        **task_cfg,
+    # ── Mock fallback ────────────────────────────────────────────────────────
+    # Only reached in "auto" mode with neither provider configured — lets the
+    # pipeline still run end-to-end (demos, CI, sandboxes with no model access)
+    # instead of hard-failing. Never silently used when a provider IS configured.
+    logger.warning(
+        "No LLM provider available (no Ollama, no OPENAI_API_KEY) — "
+        "falling back to MockChatModel. Output is NOT real clinical reasoning."
     )
-    logger.debug("LLM[%s] → OpenAI/%s", task_type, cfg.openai_fallback_model)
-    return model
+    return _mock_model(task_type)
+
+
+def _mock_model(task_type: TaskType) -> BaseChatModel:
+    from medgraph.mock_llm import MockChatModel
+
+    logger.debug("LLM[%s] → Mock (no provider configured)", task_type)
+    return MockChatModel(task_type=task_type)

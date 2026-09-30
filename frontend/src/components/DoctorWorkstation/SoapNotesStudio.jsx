@@ -1,23 +1,38 @@
-import React, { useState } from 'react';
-import { 
-  FileEdit, 
-  Copy, 
-  Check, 
-  Pill, 
-  Download, 
-  Sparkles, 
-  ShieldCheck, 
+import React, { useState, useEffect } from 'react';
+import {
+  FileEdit,
+  Copy,
+  Check,
+  Pill,
+  Sparkles,
+  ShieldCheck,
   AlertTriangle,
-  Send
 } from 'lucide-react';
+import ScribeRecorder from './ScribeRecorder';
+import { getScribeNote } from '../../services/api';
 
-export default function SoapNotesStudio({ 
-  patient, 
-  primaryDiagnosis = "Acute Asthma Exacerbation (J45.909)", 
-  medications = [], 
-  caseSummary = "" 
+export default function SoapNotesStudio({
+  patient,
+  sessionId,
+  primaryDiagnosis = "Acute Asthma Exacerbation (J45.909)",
+  medications = [],
+  caseSummary = ""
 }) {
   const [copied, setCopied] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  const [scribeNote, setScribeNote] = useState(null);
+
+  useEffect(() => {
+    if (!sessionId) return;
+    getScribeNote(sessionId).then((res) => {
+      if (!res) return;
+      const segments = res.transcript_segments || [];
+      if (segments.length) {
+        setTranscript(segments.map((s) => s.text).filter(Boolean).join(' '));
+      }
+      if (res.scribe_note) setScribeNote(res.scribe_note);
+    });
+  }, [sessionId]);
 
   const defaultMeds = medications.length > 0 ? medications : [
     {
@@ -46,7 +61,28 @@ export default function SoapNotesStudio({
     }
   ];
 
-  const soapContent = `PATIENT CLINICAL SOAP NOTE & SUMMARY
+  // Real, backend-generated SOAP note takes priority; otherwise a labeled
+  // illustrative placeholder so the panel still demonstrates the layout.
+  const isGenerated = Boolean(scribeNote && (scribeNote.subjective || scribeNote.objective || scribeNote.assessment || scribeNote.plan));
+
+  const soapContent = isGenerated
+    ? `PATIENT CLINICAL SOAP NOTE (ambient scribe — generated from recorded consultation)
+Patient: ${patient?.name || "John Doe"} | MRN: ${patient?.mrn || "MRN-2026-0891"} | Date: ${new Date().toLocaleDateString()}
+
+=======================================================
+[S] SUBJECTIVE:
+${scribeNote.subjective || "—"}
+
+[O] OBJECTIVE:
+${scribeNote.objective || "—"}
+
+[A] ASSESSMENT:
+${scribeNote.assessment || "—"}
+
+[P] PLAN:
+${scribeNote.plan || "—"}
+=======================================================`
+    : `PATIENT CLINICAL SOAP NOTE & SUMMARY (illustrative placeholder — record the consultation above to generate a real note)
 Patient: ${patient?.name || "John Doe"} | MRN: ${patient?.mrn || "MRN-2026-0891"} | Date: ${new Date().toLocaleDateString()}
 Attending Physician: Dr. Sarah Jenkins, MD (MD-98210-NY)
 
@@ -83,7 +119,7 @@ Patient is a 50-year-old male presenting with intermittent shortness of breath (
 
   return (
     <div className="flex-1 overflow-y-auto p-6 space-y-6">
-      
+
       {/* Title & Copy Bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
@@ -92,7 +128,9 @@ Patient is a 50-year-old male presenting with intermittent shortness of breath (
             <span>Auto SOAP Note &amp; e-Prescription Studio</span>
           </h3>
           <p className="text-xs text-slate-400 mt-0.5">
-            Synthesized structured clinical note adhering to ICD-10 &amp; AMA clinical documentation guidelines.
+            {isGenerated
+              ? "Generated from the recorded consultation transcript below."
+              : "Synthesized structured clinical note adhering to ICD-10 & AMA clinical documentation guidelines."}
           </p>
         </div>
 
@@ -105,8 +143,15 @@ Patient is a 50-year-old male presenting with intermittent shortness of breath (
         </button>
       </div>
 
+      <ScribeRecorder
+        sessionId={sessionId}
+        transcript={transcript}
+        onTranscriptAppend={(text) => setTranscript((prev) => (prev ? `${prev} ${text}` : text))}
+        onSoapGenerated={setScribeNote}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        
+
         {/* Left: Structured SOAP Text Display */}
         <div className="space-y-4">
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-3 font-mono text-xs text-slate-300 whitespace-pre-wrap leading-relaxed max-h-[500px] overflow-y-auto">

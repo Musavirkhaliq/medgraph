@@ -62,6 +62,10 @@ async def memory_recall_node(state: MedicalState) -> dict:
     patient_history_snippets: list[dict[str, Any]] = []
     relevant_agent_knowledge: list[dict[str, Any]] = []
     node_errors: list[str] = []
+    ehr_synced = False
+    latest_vitals: dict[str, Any] | None = None
+    news2_score: int | None = None
+    news2_risk_band: str | None = None
 
     mem_mgr = get_memory_manager()
 
@@ -75,6 +79,35 @@ async def memory_recall_node(state: MedicalState) -> dict:
         except Exception as exc:
             logger.warning("[memory_recall] Patient profile lookup failed: %s", exc)
             node_errors.append(f"memory_recall: profile lookup failed: {exc}")
+
+        # EHR (FHIR) enrichment — merges real allergy/medication/condition data
+        # from the patient's external record into the same patient_context dict
+        # already consumed by every downstream node via build_context_prompt.
+        try:
+            from medgraph.ehr.client import get_fhir_client
+            from medgraph.ehr.mapper import merge_fhir_into_patient_context
+
+            fhir_client = get_fhir_client()
+            fhir_bundle = await fhir_client.get_patient_bundle(patient_id)
+            if fhir_bundle:
+                patient_context = merge_fhir_into_patient_context(patient_context, fhir_bundle)
+                ehr_synced = True
+        except Exception as exc:
+            logger.warning("[memory_recall] FHIR enrichment failed: %s", exc)
+            node_errors.append(f"memory_recall: fhir enrichment failed: {exc}")
+
+        # Longitudinal vitals — latest reading + NEWS2 deterioration score.
+        try:
+            from medgraph.db.repository import get_latest_vitals
+
+            vitals_row = await get_latest_vitals(patient_id)
+            if vitals_row:
+                latest_vitals = vitals_row
+                news2_score = vitals_row.get("news2_score")
+                news2_risk_band = vitals_row.get("news2_risk_band")
+        except Exception as exc:
+            logger.warning("[memory_recall] Vitals lookup failed: %s", exc)
+            node_errors.append(f"memory_recall: vitals lookup failed: {exc}")
 
         try:
             history = await mem_mgr.query_local_memory(patient_id, query_text=query_text, limit=5)
@@ -116,6 +149,10 @@ async def memory_recall_node(state: MedicalState) -> dict:
         "patient_context": patient_context,
         "patient_history_snippets": patient_history_snippets,
         "relevant_agent_knowledge": relevant_agent_knowledge,
+        "ehr_synced": ehr_synced,
+        "latest_vitals": latest_vitals,
+        "news2_score": news2_score,
+        "news2_risk_band": news2_risk_band,
     }
     if node_errors:
         result["node_errors"] = node_errors

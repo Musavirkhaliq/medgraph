@@ -52,6 +52,28 @@ def triage_node(state: MedicalState) -> dict:
     patient_input = state.get("patient_input", "")
     logger.info("[triage] Running triage assessment")
 
+    # ── Step 0: Deterministic NEWS2 deterioration override ────────────────────
+    # A high early-warning score (from vitals recorded earlier this visit or a
+    # prior one) must never be overridden by LLM judgment — mirrors the keyword
+    # based override in Step 1 below.
+    from medgraph.config import get_settings
+    news2_score = state.get("news2_score")
+    if news2_score is not None and news2_score >= get_settings().news2_alert_threshold:
+        logger.warning("[triage] NEWS2 score %d exceeds alert threshold — forcing emergency", news2_score)
+        return {
+            "triage_level": "emergency",
+            "suspected_domains": ["emergency_medicine"],
+            "triage_reasoning": f"NEWS2 early-warning score {news2_score} ({state.get('news2_risk_band')} risk) indicates clinical deterioration.",
+            "is_emergency": True,
+            "emergency_info": {
+                "is_emergency": True,
+                "level": "critical",
+                "trigger": f"news2_score={news2_score}",
+                "action_required": "IMMEDIATE MEDICAL ATTENTION",
+                "recommendation": "NEWS2 score indicates high risk of deterioration — escalate for immediate clinical review.",
+            },
+        }
+
     # ── Step 1: Fast rule-based emergency check ───────────────────────────────
     safety_check = detect_emergency(patient_input)
     if safety_check["level"] == "critical":

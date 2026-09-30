@@ -1,0 +1,43 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "pat-003",
+        "identifier": [{"system": "urn:mrn", "value": "MRN-2026-0419"}],
+        "name": [{"family": "Chen", "given": ["Robert"]}],
+        "gender": "male",
+        "birthDate": "1958-07-22"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-pat-003-1",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Chronic obstructive pulmonary disease", "coding": [{"code": "J44", "display": "COPD"}]},
+        "onsetDateTime": "2015-09-05"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "med-pat-003-1",
+        "status": "active",
+        "medicationCodeableConcept": {"text": "Tiotropium 18mcg inhaler"},
+        "dosageInstruction": [{"text": "1 inhalation once daily", "route": {"text": "inhalation"}, "timing": {"code": {"text": "daily"}}}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-pat-003-1",
+        "code": {"text": "Oxygen saturation"},
+        "valueQuantity": {"value": 94, "unit": "%"},
+        "effectiveDateTime": "2026-08-10"
+      }
+    }
+  ]
+}

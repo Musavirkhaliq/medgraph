@@ -10,15 +10,21 @@ import {
   ShieldAlert
 } from 'lucide-react';
 
-export default function RightIntelligenceHud({ 
-  triageLevel = "Urgent", 
-  triageConfidence = 94, 
-  symptoms = [], 
-  tests = [], 
-  differential = [], 
+export default function RightIntelligenceHud({
+  triageLevel = "Urgent",
+  triageConfidence = 94,
+  symptoms = [],
+  tests = [],
+  differential = [],
+  news2 = null,
   onGenerateReportClick,
-  canGenerateReport = true 
+  canGenerateReport = true
 }) {
+  const news2BandClass = {
+    high: 'bg-rose-500/15 text-rose-400 border-rose-500/30',
+    medium: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
+    low: 'bg-teal-500/15 text-teal-400 border-teal-500/30',
+  }[news2?.riskBand] || 'bg-slate-800 text-slate-400 border-white/10';
   const defaultSymptoms = symptoms.length > 0 ? symptoms : [
     { entity: "Shortness of breath (Dyspnea)", status: "Reported Present" },
     { entity: "Expiratory wheezing", status: "Auscultated" },
@@ -56,6 +62,18 @@ export default function RightIntelligenceHud({
           🚨 {triageLevel || "Urgent (Level 3)"}
         </div>
       </div>
+
+      {/* NEWS2 Early Warning Score (only when a vitals reading has been scored) */}
+      {news2 && (
+        <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 space-y-2">
+          <div className="flex items-center justify-between text-xs text-slate-400">
+            <span className="font-mono uppercase tracking-wider text-[10px]">NEWS2 Deterioration Score</span>
+          </div>
+          <div className={`py-1.5 px-3 rounded-lg border text-center font-bold text-xs uppercase tracking-wide ${news2BandClass}`}>
+            Score {news2.score} &bull; {news2.riskBand} risk
+          </div>
+        </div>
+      )}
 
       {/* Extracted Clinical Symptoms & Entities */}
       <div className="p-3.5 rounded-xl bg-slate-900/80 border border-white/10 space-y-2.5">

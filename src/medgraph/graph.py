@@ -34,7 +34,9 @@ Graph layout
           │
           ├── interpret ──▶ [interpreter] ──┐
           │                                 │
-          └── diagnose ────────────────────▶┘
+          └── diagnose ─────────────────────┤
+                                            ▼
+                                  [guideline_retrieval]
                                             │
                                             ▼
                                        [diagnostician]
@@ -61,6 +63,7 @@ from langgraph.graph import END, START, StateGraph
 from medgraph.nodes.case_builder import case_builder_node
 from medgraph.nodes.diagnostician import diagnostician_node
 from medgraph.nodes.emergency import emergency_node
+from medgraph.nodes.guideline_retrieval import guideline_retrieval_node
 from medgraph.nodes.intake import intake_node
 from medgraph.nodes.interpreter import interpreter_node
 from medgraph.nodes.investigator import investigator_node, investigator_router
@@ -98,6 +101,7 @@ def build_graph() -> StateGraph:
     builder.add_node("case_builder", case_builder_node)
     builder.add_node("investigator", investigator_node)
     builder.add_node("interpreter", interpreter_node)
+    builder.add_node("guideline_retrieval", guideline_retrieval_node)
     builder.add_node("diagnostician", diagnostician_node)
     builder.add_node("treatment", treatment_node)
     builder.add_node("increment_retry", _increment_retry)
@@ -147,7 +151,7 @@ def build_graph() -> StateGraph:
         {
             "ask_for_test_results": "ask_for_test_results",
             "interpret": "interpreter",
-            "diagnose": "diagnostician"
+            "diagnose": "guideline_retrieval"
         },
     )
 
@@ -158,10 +162,11 @@ def build_graph() -> StateGraph:
         {
             "ask_for_test_results": "ask_for_test_results", # Should not happen since endpoint sets it to False
             "interpret": "interpreter",
-            "diagnose": "diagnostician"
+            "diagnose": "guideline_retrieval"
         },
     )
-    builder.add_edge("interpreter", "diagnostician")
+    builder.add_edge("interpreter", "guideline_retrieval")
+    builder.add_edge("guideline_retrieval", "diagnostician")
 
     builder.add_edge("diagnostician", "treatment")
     builder.add_edge("treatment", "validator")

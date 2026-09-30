@@ -377,5 +377,15 @@ def serve(
     uvicorn.run("medgraph.api.app:app", host=host, port=port, reload=reload)
 
 
+@app.command("ingest-guidelines")
+def ingest_guidelines_command():
+    """📚  Ingest the local guideline corpus (data/guidelines/*.md) for RAG retrieval."""
+    from medgraph.services.guideline_store import ingest_guidelines
+
+    console.print("[bold cyan]Ingesting guideline corpus …[/bold cyan]")
+    count = asyncio.run(ingest_guidelines())
+    console.print(f"[green]✔[/green]  Ingested {count} guideline chunk(s).")
+
+
 if __name__ == "__main__":
     app()

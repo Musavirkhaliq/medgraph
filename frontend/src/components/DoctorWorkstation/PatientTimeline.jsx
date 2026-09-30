@@ -1,21 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Calendar, 
-  Clock, 
-  FileText, 
-  Activity, 
-  Plus, 
-  CheckCircle2, 
+import {
+  Calendar,
+  Clock,
+  FileText,
+  Activity,
+  Plus,
+  CheckCircle2,
   AlertCircle,
   RefreshCw,
-  Sparkles
+  Sparkles,
+  Database
 } from 'lucide-react';
-import { getPatientMemoryTimeline, addInterimNote } from '../../services/api';
+import { getPatientMemoryTimeline, addInterimNote, getPatientEHRData } from '../../services/api';
 
 export default function PatientTimeline({ patient }) {
   const [interimNote, setInterimNote] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [ehrData, setEhrData] = useState(null);
   const [notesList, setNotesList] = useState([
     {
       date: "Today — Active Consultation",
@@ -65,6 +67,10 @@ export default function PatientTimeline({ patient }) {
     };
 
     fetchTimeline();
+
+    getPatientEHRData(patient?.id || 'pat-001').then((res) => {
+      if (res?.ehr) setEhrData(res.ehr);
+    });
   }, [patient]);
 
   const handleAddNote = async (e) => {
@@ -153,6 +159,35 @@ export default function PatientTimeline({ patient }) {
 
         {/* Add Interim Note */}
         <div className="space-y-4">
+          {ehrData && (
+            <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-2.5">
+              <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
+                <Database className="w-3.5 h-3.5 text-indigo-400" />
+                <span>From EHR Record</span>
+              </h4>
+              <div className="space-y-1.5 text-[11px]">
+                {ehrData.allergies?.length > 0 && (
+                  <div>
+                    <span className="text-slate-500">Allergies: </span>
+                    <span className="text-rose-300">{ehrData.allergies.map(a => a.substance).join(', ')}</span>
+                  </div>
+                )}
+                {ehrData.conditions?.length > 0 && (
+                  <div>
+                    <span className="text-slate-500">Conditions: </span>
+                    <span className="text-slate-200">{ehrData.conditions.map(c => c.name).join(', ')}</span>
+                  </div>
+                )}
+                {ehrData.medications?.length > 0 && (
+                  <div>
+                    <span className="text-slate-500">Active Medications: </span>
+                    <span className="text-slate-200">{ehrData.medications.map(m => m.name).join(', ')}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           <div className="p-5 rounded-2xl bg-slate-900/80 border border-white/10 space-y-3">
             <h4 className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold flex items-center gap-1.5">
               <Plus className="w-3.5 h-3.5 text-cyan-400" />

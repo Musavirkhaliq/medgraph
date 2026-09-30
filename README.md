@@ -24,6 +24,20 @@ Q&A, safety validation, and per-session state isolation.
 
 ---
 
+## 🆕 Recent Feature Additions
+
+| Feature | What it does | Key files |
+|---|---|---|
+| **Ambient clinical scribe** | Record the consultation and auto-generate a structured SOAP note from the transcript | `services/scribe.py`, `services/voice.py`, `POST /sessions/{id}/scribe/*` |
+| **EHR / FHIR integration** | Merges a patient's allergies/medications/conditions from a FHIR R4 record (local mock bundles by default; point `FHIR_SERVER_URL` at a real server) into session context | `ehr/client.py`, `ehr/mapper.py`, `data/fhir_mock/*.json` |
+| **Doctor review & sign-off** | Advisory approve/edit/reject workflow on the completed report | `POST /sessions/{id}/review`, `state.review_status` |
+| **Guideline-grounded reasoning (RAG)** | Diagnosis/treatment retrieve and cite a curated guideline corpus instead of relying on parametric recall alone | `services/guideline_store.py`, `nodes/guideline_retrieval.py`, `data/guidelines/*.md` — seed with `uv run medgraph ingest-guidelines` |
+| **Longitudinal vitals + NEWS2** | Records vitals over time and computes the NEWS2 deterioration score; a high score forces emergency triage | `services/early_warning.py`, `POST/GET /patients/{id}/vitals*` |
+
+All five degrade gracefully with no Supabase configured (in-memory fallback), matching the existing dual-tier memory pattern.
+
+---
+
 ## 🏗️ Architecture
 
 ```

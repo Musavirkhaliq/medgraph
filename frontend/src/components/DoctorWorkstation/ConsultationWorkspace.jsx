@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
-import { 
-  MessageSquare, 
-  Network, 
-  FileCheck, 
-  FileEdit, 
-  Calendar, 
-  Activity, 
+import {
+  MessageSquare,
+  Network,
+  FileCheck,
+  FileEdit,
+  Calendar,
+  Activity,
   FileText,
-  Stethoscope
+  Stethoscope,
+  HeartPulse
 } from 'lucide-react';
 import AgentPipelineSidebar from './AgentPipelineSidebar';
 import ChatStream from './ChatStream';
@@ -15,6 +16,7 @@ import DifferentialMatrix from './DifferentialMatrix';
 import DicomLabsViewer from './DicomLabsViewer';
 import SoapNotesStudio from './SoapNotesStudio';
 import PatientTimeline from './PatientTimeline';
+import VitalsTrendChart from './VitalsTrendChart';
 import RightIntelligenceHud from './RightIntelligenceHud';
 
 export default function ConsultationWorkspace({
@@ -39,6 +41,8 @@ export default function ConsultationWorkspace({
   differential,
   primaryDiagnosis,
   medications,
+  citations,
+  news2,
   onOpenAgentTelemetry,
   onOpenFinalReport,
   onToggleManualTests,
@@ -111,6 +115,18 @@ export default function ConsultationWorkspace({
             <Calendar className="w-3.5 h-3.5" />
             <span>Longitudinal Patient Timeline</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('vitals')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+              activeTab === 'vitals'
+                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 shadow-glow-cyan'
+                : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+            }`}
+          >
+            <HeartPulse className="w-3.5 h-3.5" />
+            <span>Vitals &amp; NEWS2</span>
+          </button>
         </nav>
 
         <button
@@ -157,6 +173,7 @@ export default function ConsultationWorkspace({
             <DifferentialMatrix
               primaryDiagnosis={primaryDiagnosis}
               differential={differential}
+              citations={citations}
             />
           )}
 
@@ -171,6 +188,7 @@ export default function ConsultationWorkspace({
           {activeTab === 'soap' && (
             <SoapNotesStudio
               patient={patient}
+              sessionId={sessionId}
               primaryDiagnosis={primaryDiagnosis}
               medications={medications}
             />
@@ -179,6 +197,13 @@ export default function ConsultationWorkspace({
           {activeTab === 'history' && (
             <PatientTimeline
               patient={patient}
+            />
+          )}
+
+          {activeTab === 'vitals' && (
+            <VitalsTrendChart
+              patient={patient}
+              sessionId={sessionId}
             />
           )}
         </main>
@@ -190,6 +215,7 @@ export default function ConsultationWorkspace({
           symptoms={symptoms}
           tests={investigations}
           differential={differential}
+          news2={news2}
           onGenerateReportClick={onOpenFinalReport}
         />
 

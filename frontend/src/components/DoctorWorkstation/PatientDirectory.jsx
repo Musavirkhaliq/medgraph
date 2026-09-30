@@ -1,17 +1,19 @@
-import React, { useState } from 'react';
-import { 
-  Search, 
-  UserPlus, 
-  AlertCircle, 
-  CheckCircle, 
-  Clock, 
-  ArrowRight, 
-  ChevronRight, 
-  ShieldAlert, 
-  User, 
+import React, { useState, useEffect } from 'react';
+import {
+  Search,
+  UserPlus,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  ArrowRight,
+  ChevronRight,
+  ShieldAlert,
+  User,
   Stethoscope,
-  HeartPulse
+  HeartPulse,
+  Database
 } from 'lucide-react';
+import { getPatientLatestVitals, getPatientEHRData } from '../../services/api';
 
 export const DEFAULT_PATIENTS = [
   {
@@ -61,6 +63,23 @@ export const DEFAULT_PATIENTS = [
 export default function PatientDirectory({ onSelectPatient, onRegisterNewClick }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState('all');
+  const [news2ByPatient, setNews2ByPatient] = useState({});
+  const [ehrByPatient, setEhrByPatient] = useState({});
+
+  useEffect(() => {
+    DEFAULT_PATIENTS.forEach((pat) => {
+      getPatientLatestVitals(pat.id).then((res) => {
+        if (res?.reading) {
+          setNews2ByPatient((prev) => ({ ...prev, [pat.id]: res.reading }));
+        }
+      });
+      getPatientEHRData(pat.id).then((res) => {
+        if (res?.ehr) {
+          setEhrByPatient((prev) => ({ ...prev, [pat.id]: true }));
+        }
+      });
+    });
+  }, []);
 
   const filteredPatients = DEFAULT_PATIENTS.filter(pat => {
     const q = searchTerm.toLowerCase();
@@ -154,9 +173,25 @@ export default function PatientDirectory({ onSelectPatient, onRegisterNewClick }
                   </div>
                 </div>
 
-                <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {patient.status}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-[10px] font-semibold uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                    {patient.status}
+                  </span>
+                  {ehrByPatient[patient.id] && (
+                    <span className="flex items-center gap-1 text-[9px] font-semibold uppercase px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                      <Database className="w-2.5 h-2.5" /> EHR Synced
+                    </span>
+                  )}
+                  {news2ByPatient[patient.id] && (
+                    <span className={`flex items-center gap-1 text-[9px] font-semibold uppercase px-2 py-0.5 rounded-full border ${
+                      news2ByPatient[patient.id].news2_risk_band === 'high' ? 'bg-rose-500/10 text-rose-300 border-rose-500/20'
+                      : news2ByPatient[patient.id].news2_risk_band === 'medium' ? 'bg-amber-500/10 text-amber-300 border-amber-500/20'
+                      : 'bg-teal-500/10 text-teal-300 border-teal-500/20'
+                    }`}>
+                      <HeartPulse className="w-2.5 h-2.5" /> NEWS2 {news2ByPatient[patient.id].news2_score}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Conditions & Allergies */}

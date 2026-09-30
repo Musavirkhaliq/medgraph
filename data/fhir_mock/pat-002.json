@@ -1,0 +1,43 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "pat-002",
+        "identifier": [{"system": "urn:mrn", "value": "MRN-2026-1042"}],
+        "name": [{"family": "Miller", "given": ["Jane"]}],
+        "gender": "female",
+        "birthDate": "1989-11-02"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "allergy-pat-002-1",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Sulfa drugs"},
+        "reaction": [{"manifestation": [{"text": "Skin rash"}], "severity": "moderate"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-pat-002-1",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Type 2 diabetes mellitus", "coding": [{"code": "E11", "display": "Type 2 diabetes mellitus"}]},
+        "onsetDateTime": "2020-01-10"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "med-pat-002-1",
+        "status": "active",
+        "medicationCodeableConcept": {"text": "Metformin 500mg"},
+        "dosageInstruction": [{"text": "1 tablet twice daily with meals", "route": {"text": "oral"}, "timing": {"code": {"text": "twice daily"}}}]
+      }
+    }
+  ]
+}

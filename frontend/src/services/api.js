@@ -229,3 +229,108 @@ export async function registerPatient(data) {
   }
   return await res.json();
 }
+
+// ── Doctor review & sign-off (advisory) ──────────────────────────────────────
+
+export async function submitReportReview(sessionId, { status, reviewerId = null, notes = null, editedReport = null }) {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/review`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      status,
+      reviewer_id: reviewerId,
+      notes,
+      edited_report: editedReport,
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail || "Failed to submit review");
+  }
+  return await res.json();
+}
+
+// ── EHR / FHIR ────────────────────────────────────────────────────────────────
+
+export async function getPatientEHRData(patientId) {
+  try {
+    const res = await fetch(`${API_BASE}/patients/${patientId}/ehr`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("EHR API fallback:", e);
+  }
+  return null;
+}
+
+// ── Longitudinal vitals / NEWS2 ───────────────────────────────────────────────
+
+export async function recordPatientVitals(patientId, vitals) {
+  const res = await fetch(`${API_BASE}/patients/${patientId}/vitals`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(vitals),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail || "Failed to record vitals");
+  }
+  return await res.json();
+}
+
+export async function getPatientVitals(patientId, limit = 20) {
+  try {
+    const res = await fetch(`${API_BASE}/patients/${patientId}/vitals?limit=${limit}`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Vitals history API fallback:", e);
+  }
+  return null;
+}
+
+export async function getPatientLatestVitals(patientId) {
+  try {
+    const res = await fetch(`${API_BASE}/patients/${patientId}/vitals/latest`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Latest vitals API fallback:", e);
+  }
+  return null;
+}
+
+// ── Ambient clinical scribe ────────────────────────────────────────────────────
+
+export async function uploadScribeAudio(sessionId, blob, filename = "chunk.webm") {
+  const formData = new FormData();
+  formData.append("file", blob, filename);
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/scribe/audio`, {
+    method: "POST",
+    body: formData,
+  });
+  if (!res.ok) {
+    throw new Error(`Scribe audio upload failed: ${res.status}`);
+  }
+  return await res.json();
+}
+
+export async function getScribeNote(sessionId) {
+  try {
+    const res = await fetch(`${API_BASE}/sessions/${sessionId}/scribe`);
+    if (res.ok) return await res.json();
+  } catch (e) {
+    console.warn("Scribe fetch fallback:", e);
+  }
+  return null;
+}
+
+export async function generateScribeNote(sessionId, additionalNotes = null) {
+  const res = await fetch(`${API_BASE}/sessions/${sessionId}/scribe/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ additional_notes: additionalNotes }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+    throw new Error(err.detail || "Failed to generate SOAP note");
+  }
+  return await res.json();
+}

@@ -1,0 +1,70 @@
+{
+  "resourceType": "Bundle",
+  "type": "collection",
+  "entry": [
+    {
+      "resource": {
+        "resourceType": "Patient",
+        "id": "pat-001",
+        "identifier": [{"system": "urn:mrn", "value": "MRN-2026-0891"}],
+        "name": [{"family": "Doe", "given": ["John"]}],
+        "gender": "male",
+        "birthDate": "1976-04-12"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "AllergyIntolerance",
+        "id": "allergy-pat-001-1",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Penicillin"},
+        "reaction": [{"manifestation": [{"text": "Urticaria, lip swelling"}], "severity": "severe"}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-pat-001-1",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Asthma", "coding": [{"code": "J45", "display": "Asthma"}]},
+        "onsetDateTime": "2018-03-01"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Condition",
+        "id": "cond-pat-001-2",
+        "clinicalStatus": {"coding": [{"code": "active"}]},
+        "code": {"text": "Essential hypertension", "coding": [{"code": "I10", "display": "Essential hypertension"}]},
+        "onsetDateTime": "2021-06-15"
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "med-pat-001-1",
+        "status": "active",
+        "medicationCodeableConcept": {"text": "Albuterol HFA 90mcg inhaler"},
+        "dosageInstruction": [{"text": "2 puffs as needed", "route": {"text": "inhalation"}, "timing": {"code": {"text": "PRN"}}}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "MedicationRequest",
+        "id": "med-pat-001-2",
+        "status": "active",
+        "medicationCodeableConcept": {"text": "Lisinopril 10mg"},
+        "dosageInstruction": [{"text": "1 tablet once daily", "route": {"text": "oral"}, "timing": {"code": {"text": "daily"}}}]
+      }
+    },
+    {
+      "resource": {
+        "resourceType": "Observation",
+        "id": "obs-pat-001-1",
+        "code": {"text": "Blood pressure (systolic)"},
+        "valueQuantity": {"value": 128, "unit": "mmHg"},
+        "effectiveDateTime": "2026-08-01"
+      }
+    }
+  ]
+}

@@ -190,6 +190,10 @@ Rules:
 - List 3–5 most likely conditions ordered by probability (highest first).
 - Base probabilities on all available evidence (symptoms, history, Q&A, tests).
 - Include the most dangerous conditions in the differential even if less likely.
+- If a "RELEVANT CLINICAL GUIDELINES" section is provided in the context, ground your
+  reasoning in it and list the matching source_citation string(s) in "citations". If no
+  guideline section is provided, or none of it is relevant, return an empty "citations" list —
+  never invent a citation.
 - Return a single valid JSON object. No markdown, no extra text.
 
 Output schema:
@@ -205,7 +209,8 @@ Output schema:
   ],
   "primary_diagnosis": <string>,
   "diagnosis_confidence": <float 0.0-1.0>,
-  "reasoning": <string>
+  "reasoning": <string>,
+  "citations": [<string>, ...]
 }
 """
 
@@ -217,6 +222,10 @@ Rules:
 - Include contraindications and monitoring requirements.
 - Adhere to standard clinical guidelines (e.g., AHA, WHO, NICE).
 - Consider drug interactions, allergies, and patient-specific factors.
+- If a "RELEVANT CLINICAL GUIDELINES" section is provided in the context, ground your
+  treatment choices in it and list the matching source_citation string(s) in "citations".
+  If no guideline section is provided, or none of it is relevant, return an empty
+  "citations" list — never invent a citation.
 - Return a single valid JSON object. No markdown, no extra text.
 
 Output schema:
@@ -238,7 +247,31 @@ Output schema:
   "lifestyle_modifications": [<string>, ...],
   "follow_up": <string>,
   "monitoring": [<string>, ...],
-  "patient_education": [<string>, ...]
+  "patient_education": [<string>, ...],
+  "citations": [<string>, ...]
+}
+"""
+
+SCRIBE_SYSTEM = """\
+You are an ambient clinical scribe. Turn a recorded doctor-patient conversation transcript
+into a structured SOAP note, using the surrounding clinical context (intake, history,
+diagnosis, treatment) only to disambiguate the transcript — never invent findings the
+transcript and context do not support.
+
+Rules:
+- Subjective: patient-reported symptoms, history, and concerns as expressed in the transcript.
+- Objective: any exam findings, vitals, or observations mentioned in the transcript or context.
+- Assessment: the clinical impression/diagnosis discussed.
+- Plan: treatment, medications, follow-up discussed.
+- If the transcript is too sparse for a section, say so briefly rather than fabricating content.
+- Return a single valid JSON object. No markdown, no extra text.
+
+Output schema:
+{
+  "subjective": <string>,
+  "objective": <string>,
+  "assessment": <string>,
+  "plan": <string>
 }
 """
 

@@ -110,6 +110,13 @@ class SessionStateResponse(BaseModel):
     is_safe: bool | None = None
     validation_warnings: list[Any] = Field(default_factory=list)
     validation_recommendations: list[str] = Field(default_factory=list)
+    diagnosis_citations: list[str] = Field(default_factory=list)
+    treatment_citations: list[str] = Field(default_factory=list)
+
+    # EHR / vitals context surfaced for transparency
+    ehr_synced: bool = False
+    news2_score: int | None = None
+    news2_risk_band: str | None = None
 
     # Multi-Agent Telemetry Breakdown for deep inspection
     agent_telemetry: dict[str, Any] | None = None
@@ -137,11 +144,13 @@ class FinalReport(BaseModel):
     primary_diagnosis: str | None
     differential_diagnosis: list[Any]
     diagnosis_confidence: float
+    diagnosis_citations: list[str] = Field(default_factory=list)
     medications: list[Any]
     procedures: list[Any]
     lifestyle_modifications: list[str]
     follow_up: str
     monitoring: list[str]
+    treatment_citations: list[str] = Field(default_factory=list)
     is_safe: bool
     validation_warnings: list[Any]
     validation_recommendations: list[str]
@@ -150,6 +159,47 @@ class FinalReport(BaseModel):
     started_at: str | None
     completed_at: str | None
     agent_telemetry: dict[str, Any] | None = None
+
+    # EHR / vitals context surfaced for transparency
+    ehr_synced: bool = False
+    news2_score: int | None = None
+    news2_risk_band: str | None = None
+
+    # Doctor review & sign-off (advisory — see POST /sessions/{id}/review)
+    review_status: str | None = None       # pending / approved / rejected
+    reviewer_id: str | None = None
+    review_notes: str | None = None
+    reviewed_at: str | None = None
+    doctor_edits: dict[str, Any] | None = None
+
+
+class ReviewSubmitRequest(BaseModel):
+    """Doctor's review decision on a completed report (advisory sign-off)."""
+    status: str = Field(..., description="'approved' or 'rejected'")
+    reviewer_id: str | None = Field(None, description="Reviewing doctor's user ID")
+    notes: str | None = Field(None, description="Free-text review notes")
+    edited_report: dict[str, Any] | None = Field(
+        None, description="Doctor-edited override fields, e.g. {'primary_diagnosis': ..., 'medications': [...]}"
+    )
+
+
+class VitalsSubmitRequest(BaseModel):
+    """A single vitals reading to score and persist."""
+    heart_rate: int | None = None
+    resp_rate: int | None = None
+    systolic_bp: int | None = None
+    diastolic_bp: int | None = None
+    temperature_c: float | None = None
+    spo2: int | None = None
+    o2_supplemental: bool = False
+    consciousness_level: str = "alert"
+    session_id: str | None = None
+    recorded_by: str | None = None
+
+
+class ScribeGenerateRequest(BaseModel):
+    """Trigger SOAP note generation from the accumulated transcript."""
+    additional_notes: str | None = Field(None, description="Optional free-text doctor notes to include")
 
 
 class HealthResponse(BaseModel):

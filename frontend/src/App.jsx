@@ -65,6 +65,8 @@ export default function App() {
   const [primaryDiagnosis, setPrimaryDiagnosis] = useState("Acute Moderate Asthma Exacerbation (J45.909)");
   const [differential, setDifferential] = useState([]);
   const [medications, setMedications] = useState([]);
+  const [citations, setCitations] = useState([]);
+  const [news2, setNews2] = useState(null);
   const [isEmergency, setIsEmergency] = useState(false);
   const [emergencyInfo, setEmergencyInfo] = useState(null);
   const [reportData, setReportData] = useState(null);
@@ -195,6 +197,9 @@ export default function App() {
         if (state.differential_diagnosis) setDifferential(state.differential_diagnosis);
         if (state.medications) setMedications(state.medications);
         if (state.investigations) setInvestigations(state.investigations);
+        const combinedCitations = [...new Set([...(state.diagnosis_citations || []), ...(state.treatment_citations || [])])];
+        if (combinedCitations.length) setCitations(combinedCitations);
+        if (state.news2_score != null) setNews2({ score: state.news2_score, riskBand: state.news2_risk_band });
 
         if (state.is_emergency) {
           setIsEmergency(true);
@@ -461,6 +466,9 @@ export default function App() {
     setIsWaitingAnswer(false);
     setCurrentQuestion("");
     setIsWaitingTests(false);
+    setCitations([]);
+    setNews2(null);
+    setReportData(null);
     setCurrentView('doctor-directory');
   };
 
@@ -551,6 +559,8 @@ export default function App() {
             differential={differential}
             primaryDiagnosis={primaryDiagnosis}
             medications={medications}
+            citations={citations}
+            news2={news2}
             onOpenAgentTelemetry={(key = 'intake_agent') => {
               setSelectedTelemetryKey(key);
               setIsTelemetryOpen(true);
@@ -565,6 +575,8 @@ export default function App() {
           <FinalClinicalReport
             patient={selectedPatient}
             reportData={reportData}
+            sessionId={sessionId}
+            reviewerId={user?.id || 'doc-001'}
             onNewConsultation={handleResetSession}
           />
         )}

@@ -246,3 +246,74 @@ async def get_session_telemetry(session_id: str) -> list[AgentTelemetryItem]:
 
     items = [t for t in _telemetry_db if t["session_id"] in (session_id, sess_uuid)]
     return [AgentTelemetryItem.model_validate(t) for t in items]
+
+
+# ── Longitudinal vitals / NEWS2 early warning ────────────────────────────────
+
+_vitals_db: list[dict] = []
+
+
+async def record_vitals(patient_id: str, vitals: dict[str, Any], recorded_by: str | None = None) -> dict[str, Any]:
+    """
+    Score and persist a single vitals reading for a patient.
+
+    Computes the NEWS2 deterioration score deterministically (no LLM) via
+    ``early_warning.calculate_news2`` and stores the reading alongside it, so
+    the score is fixed at the time of recording rather than recomputed later.
+    """
+    from medgraph.db.client import to_uuid_safe
+    from medgraph.services.early_warning import calculate_news2
+
+    news2 = calculate_news2(vitals)
+    row: dict[str, Any] = {
+        "id": str(uuid.uuid4()),
+        "patient_id": to_uuid_safe(patient_id),
+        "session_id": vitals.get("session_id"),
+        "recorded_at": datetime.now(timezone.utc).isoformat(),
+        "heart_rate": vitals.get("heart_rate"),
+        "resp_rate": vitals.get("resp_rate"),
+        "systolic_bp": vitals.get("systolic_bp"),
+        "diastolic_bp": vitals.get("diastolic_bp"),
+        "temperature_c": vitals.get("temperature_c"),
+        "spo2": vitals.get("spo2"),
+        "o2_supplemental": bool(vitals.get("o2_supplemental", False)),
+        "consciousness_level": vitals.get("consciousness_level", "alert"),
+        "recorded_by": recorded_by,
+        "news2_score": news2["score"],
+        "news2_risk_band": news2["risk_band"],
+    }
+
+    client = get_db_client()
+    if client.is_configured:
+        await client.rest_request("POST", "patient_vitals", json_data=row)
+
+    _vitals_db.append(row)
+    logger.info(
+        "[Repository] Recorded vitals for patient %s: NEWS2=%d (%s)",
+        patient_id, news2["score"], news2["risk_band"],
+    )
+    return {**row, "component_scores": news2["component_scores"]}
+
+
+async def list_vitals(patient_id: str, limit: int = 20) -> list[dict[str, Any]]:
+    """Retrieve recent vitals history for a patient, most recent first."""
+    from medgraph.db.client import to_uuid_safe
+    pid_uuid = to_uuid_safe(patient_id)
+    client = get_db_client()
+    if client.is_configured:
+        rows = await client.rest_request(
+            "GET", "patient_vitals",
+            params={"patient_id": f"eq.{pid_uuid}", "order": "recorded_at.desc", "limit": str(limit)},
+        )
+        if rows:
+            return rows
+
+    items = [v for v in _vitals_db if v["patient_id"] in (patient_id, pid_uuid)]
+    items.sort(key=lambda x: x.get("recorded_at", ""), reverse=True)
+    return items[:limit]
+
+
+async def get_latest_vitals(patient_id: str) -> dict[str, Any] | None:
+    """Retrieve the most recent vitals reading for a patient, if any."""
+    readings = await list_vitals(patient_id, limit=1)
+    return readings[0] if readings else None
